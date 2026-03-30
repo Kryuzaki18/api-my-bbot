@@ -51,7 +51,8 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
       return reply.code(200).send({ token });
     } catch (error: any) {
       if (error.status && error.status >= 400 && error.status < 500) {
-        return reply.code(401).send({ error: 'Invalid API Keys or unauthorized.' });
+        const msg = error.details?.msg || 'Invalid API Keys or unauthorized.';
+        return reply.code(401).send({ error: msg });
       }
       return reply.code(400).send({ error: error.message || 'Failed to sign in', details: error.details });
     }
