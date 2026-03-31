@@ -14,6 +14,7 @@ import {
 } from '../models/order.model.js';
 
 export class BinanceService {
+  private static exchangeInfoCache: Record<string, any> = {};
   
   private static getBaseUrl(useTestnet: boolean) {
     return useTestnet ? BINANCE_FUTURES_TESTNET_URL : BINANCE_FUTURES_PROD_URL;
@@ -97,7 +98,6 @@ export class BinanceService {
     return this.makeApiRequest(apiKey, useTestnet, 'DELETE', '/fapi/v1/listenKey');
   }
 
-  private static exchangeInfoCache: Record<string, any> = {};
 
   private async getExchangeInfo(useTestnet: boolean) {
     const cacheKey = useTestnet ? 'testnet' : 'mainnet';
@@ -146,12 +146,22 @@ export class BinanceService {
         }
       }
     } catch (e: any) {
+
+    console.log('\x1b[31m'+ e +'\x1b[0m');
+
       if (e.status === 400) throw e;
       console.warn('Failed to fetch/apply exchange info filters:', e);
     }
   }
 
   async placeOrder(apiKey: string, apiSecret: string, params: OrderParams) {
+    if (params.leverage !== undefined) {
+      await this.makeSignedRequest(apiKey, apiSecret, params.useTestnet, 'POST', '/fapi/v1/leverage', {
+        symbol: params.symbol,
+        leverage: params.leverage,
+      });
+    }
+
     await this.applyExchangeFilters(params, params.useTestnet);
 
     const queryParams: Record<string, string | number> = {

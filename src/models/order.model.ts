@@ -22,6 +22,7 @@ export interface OrderParams {
   type: OrderType;
   quantity: number;
   price?: number;
+  leverage?: number;
   useTestnet: boolean;
 }
 

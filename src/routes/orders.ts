@@ -15,6 +15,7 @@ const PlaceOrderSchema = {
     type: Type.Enum(OrderType),
     quantity: Type.Number({ minimum: 0 }),
     price: Type.Optional(Type.Number()),
+    leverage: Type.Optional(Type.Number({ minimum: 1, maximum: 125 })),
   }),
   response: {
     200: Type.Any(),
