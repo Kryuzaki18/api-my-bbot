@@ -1,7 +1,7 @@
 import { type FastifyInstance, type FastifyPluginAsync } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import { BinanceService } from '../services/binance.js';
-import { ROUTES } from '../config/constants.js';
+import { ROUTES } from '../config/api-config.js';
 
 const GetStreamSchema = {
   description: 'Starts a new user data stream and returns a listenKey.',

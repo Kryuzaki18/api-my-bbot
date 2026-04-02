@@ -1,7 +1,7 @@
 import { type FastifyInstance, type FastifyPluginAsync } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import { BinanceService } from '../services/binance.js';
-import { ROUTES } from '../config/constants.js';
+import { ROUTES } from '../config/api-config.js';
 
 const UserInfoSchema = {
   description: 'Fetches account information and balances for the authenticated user from Binance futures API.',

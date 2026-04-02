@@ -1,7 +1,7 @@
 import { type FastifyInstance, type FastifyPluginAsync } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import { BinanceService } from '../services/binance.js';
-import { ROUTES } from '../config/constants.js';
+import { ROUTES } from '../config/api-config.js';
 
 const SigninSchema = {
   description: 'Proves Binance credentials by fetching account details and issues a secure stateless JWT session token.',

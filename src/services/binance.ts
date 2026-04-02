@@ -4,7 +4,7 @@ import {
   BINANCE_FUTURES_PROD_URL, 
   BINANCE_FUTURES_TESTNET_URL, 
   BINANCE_ENDPOINTS 
-} from '../config/constants.js';
+} from '../config/api-config.js';
 import { 
   type OrderParams, 
   type TakeProfitParams, 

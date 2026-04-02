@@ -1,7 +1,7 @@
 import { type FastifyInstance, type FastifyPluginAsync } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import { BinanceService } from '../services/binance.js';
-import { ROUTES } from '../config/constants.js';
+import { ROUTES } from '../config/api-config.js';
 import { OrderSide, OrderType } from '../models/order.model.js';
 
 // Fully typed and validated schema for request payload 
