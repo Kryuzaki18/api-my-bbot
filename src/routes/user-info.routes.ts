@@ -1,7 +1,8 @@
 import { type FastifyInstance, type FastifyPluginAsync } from 'fastify';
 import { Type } from '@sinclair/typebox';
-import { BinanceService } from '../services/binance.js';
-import { ROUTES } from '../config/api-config.js';
+
+import { BinanceService } from '../services/binance.service.js';
+import { ROUTES } from '../config/app-routes.js';
 
 const UserInfoSchema = {
   description: 'Fetches account information and balances for the authenticated user from Binance futures API.',
@@ -23,7 +24,6 @@ const UserInfoSchema = {
 const userInfoRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   const binanceService = new BinanceService();
 
-  // Reject strictly any request missing a valid session token
   fastify.addHook('onRequest', async (request, reply) => {
     try {
       await request.jwtVerify();

@@ -1,8 +1,9 @@
 import { type FastifyInstance, type FastifyPluginAsync } from 'fastify';
-import authRoutes from './auth.js';
-import userInfoRoutes from './user-info.js';
-import ordersRoute from './orders.js';
-import userStreamRoutes from './user-stream.js';
+
+import authRoutes from './auth.routes.js';
+import userInfoRoutes from './user-info.routes.js';
+import ordersRoute from './orders.routes.js';
+import userStreamRoutes from './user-stream.routes.js';
 
 const appRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   fastify.register(authRoutes);

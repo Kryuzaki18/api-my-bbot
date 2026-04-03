@@ -1,10 +1,10 @@
 import { type FastifyInstance, type FastifyPluginAsync } from 'fastify';
 import { Type } from '@sinclair/typebox';
-import { BinanceService } from '../services/binance.js';
-import { ROUTES } from '../config/api-config.js';
+
+import { ROUTES } from '../config/app-routes.js';
+import { BinanceService } from '../services/binance.service.js';
 import { OrderSide, OrderType } from '../models/order.model.js';
 
-// Fully typed and validated schema for request payload 
 const PlaceOrderSchema = {
   description: 'Places a secure buy/sell Futures Trade against the Binance API on behalf of the authenticated user.',
   tags: ['Orders'],
@@ -109,7 +109,6 @@ const CancelOrderSchema = {
 const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   const binanceService = new BinanceService();
 
-  // Reject strictly any request missing a valid session token
   fastify.addHook('onRequest', async (request, reply) => {
     try {
       await request.jwtVerify();
@@ -118,7 +117,6 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     }
   });
 
-  // Endpoint to handle the regular order creation
   fastify.post(ROUTES.FUTURES_ORDER, { schema: PlaceOrderSchema }, async (request, reply) => {
     try {
       const body = request.body as any;
@@ -134,7 +132,6 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     }
   });
 
-  // Endpoint to handle take profit targets
   fastify.post(ROUTES.FUTURES_TAKE_PROFIT, { schema: TakeProfitSchema }, async (request, reply) => {
     try {
       const body = request.body as any;
@@ -150,7 +147,6 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     }
   });
 
-  // Endpoint to handle stop loss targets
   fastify.post(ROUTES.FUTURES_STOP_LOSS, { schema: StopLossSchema }, async (request, reply) => {
     try {
       const body = request.body as any;
@@ -166,7 +162,6 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     }
   });
 
-  // Endpoint to fetch open orders
   fastify.get(ROUTES.FUTURES_OPEN_ORDERS, { schema: OpenOrdersSchema }, async (request, reply) => {
     try {
       const { symbol } = request.query as any;
@@ -186,7 +181,6 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     }
   });
 
-  // Endpoint to handle cancelling an active order
   fastify.post(ROUTES.FUTURES_CANCEL_ORDER, { schema: CancelOrderSchema }, async (request, reply) => {
     try {
       const body = request.body as any;
