@@ -7,10 +7,12 @@ import {
 } from "../config/api-binance.js";
 import {
   type OrderParams,
-  type TakeProfitParams,
+  type TPSLParams,
   type CancelOrderParams,
   OrderType,
   TimeInForce,
+  OrderSide,
+  type CancelTpSlParams,
 } from "../models/order.model.js";
 
 export class BinanceService {
@@ -105,26 +107,11 @@ export class BinanceService {
     return BinanceService.exchangeInfoCache[cacheKey];
   }
 
-  private formatPrecision(value: number, stepSize: string): number {
-    const stepSizeNum = parseFloat(stepSize);
-    if (stepSizeNum <= 0) return value;
-
-    // Calculate decimal places in stepSize
-    let precision = 0;
-    if (stepSize.indexOf(".") >= 0) {
-      precision = (stepSize.split(".")[1] || "").replace(/0+$/, "").length;
-    }
-
-    // Round down to the nearest multiple of stepSize to avoid exceeding limits
-    const rounded = Math.floor(value / stepSizeNum) * stepSizeNum;
-    return Number(rounded.toFixed(precision));
-  }
-
   private async applyExchangeFilters(params: any, useTestnet: boolean) {
     try {
       const info = await this.getExchangeInfo(useTestnet);
       const symbolInfo = info.symbols.find(
-        (s: any) => s.symbol === params.symbol,
+        (s: any) => s.symbol.toUpperCase() === params.symbol.toUpperCase(),
       );
       if (!symbolInfo) return;
 
@@ -132,7 +119,7 @@ export class BinanceService {
         (f: any) => f.filterType === "LOT_SIZE",
       );
       if (lotSizeFilter && params.quantity !== undefined) {
-        params.quantity = this.formatPrecision(
+        params.quantity = this.roundToTickSize(
           params.quantity,
           lotSizeFilter.stepSize,
         );
@@ -151,13 +138,13 @@ export class BinanceService {
       );
       if (priceFilter) {
         if (params.price !== undefined) {
-          params.price = this.formatPrecision(
+          params.price = this.roundToTickSize(
             params.price,
             priceFilter.tickSize,
           );
         }
         if (params.stopPrice !== undefined) {
-          params.stopPrice = this.formatPrecision(
+          params.stopPrice = this.roundToTickSize(
             params.stopPrice,
             priceFilter.tickSize,
           );
@@ -167,6 +154,52 @@ export class BinanceService {
       if (e.status === 400) throw e;
       console.warn("Failed to fetch/apply exchange info filters:", e);
     }
+  }
+
+  private roundToTickSize(price: number, tickSize: string): number {
+    const tickSizeNum = parseFloat(tickSize);
+    if (tickSizeNum <= 0) return price;
+
+    const precision = Math.log10(1 / tickSizeNum);
+    return Number(price.toFixed(precision));
+  }
+
+  private async setLeverage(
+    apiKey: string,
+    apiSecret: string,
+    useTestnet: boolean,
+    symbol: string,
+    leverage: number,
+  ) {
+    return this.makeSignedRequest(
+      apiKey,
+      apiSecret,
+      useTestnet,
+      "POST",
+      BINANCE_ENDPOINTS.FUTURES_LEVERAGE,
+      {
+        symbol,
+        leverage,
+      },
+    );
+  }
+
+  async getLeverageBracket(
+    apiKey: string,
+    apiSecret: string,
+    useTestnet: boolean,
+    symbol?: string,
+  ) {
+    return this.makeSignedRequest(
+      apiKey,
+      apiSecret,
+      useTestnet,
+      "GET",
+      BINANCE_ENDPOINTS.FUTURES_LEVERAGE_BRACKET,
+      {
+        symbol: symbol || "",
+      },
+    );
   }
 
   async getAccountInformation(
@@ -210,34 +243,79 @@ export class BinanceService {
     );
   }
 
-  async placeOrder(apiKey: string, apiSecret: string, params: OrderParams) {
-    if (params.leverage !== undefined) {
-      await this.makeSignedRequest(
-        apiKey,
-        apiSecret,
-        params.useTestnet,
-        "POST",
-        BINANCE_ENDPOINTS.FUTURES_LEVERAGE,
-        {
-          symbol: params.symbol,
-          leverage: params.leverage,
-        },
-      );
-    }
+  async getFuturesPositions(
+    apiKey: string,
+    apiSecret: string,
+    useTestnet: boolean,
+  ) {
+    return this.makeSignedRequest(
+      apiKey,
+      apiSecret,
+      useTestnet,
+      "GET",
+      BINANCE_ENDPOINTS.FUTURES_POSITIONS,
+    );
+  }
 
+  async getOpenOrders(
+    apiKey: string,
+    apiSecret: string,
+    useTestnet: boolean,
+    symbol?: string,
+  ) {
+    const queryParams: Record<string, string> = {};
+    if (symbol) queryParams.symbol = symbol.toUpperCase();
+    return this.makeSignedRequest(
+      apiKey,
+      apiSecret,
+      useTestnet,
+      "GET",
+      BINANCE_ENDPOINTS.FUTURES_OPEN_ORDERS,
+      queryParams,
+    );
+  }
+
+  async getPendingTpSl(
+    apiKey: string,
+    apiSecret: string,
+    useTestnet: boolean,
+    symbol?: string,
+  ) {
+    const queryParams: Record<string, string> = {};
+    if (symbol) queryParams.symbol = symbol.toUpperCase();
+    return this.makeSignedRequest(
+      apiKey,
+      apiSecret,
+      useTestnet,
+      "GET",
+      BINANCE_ENDPOINTS.FUTURES_PENDING_TP_SL,
+      queryParams,
+    );
+  }
+
+  async placeOrder(apiKey: string, apiSecret: string, params: OrderParams) {
+    await this.setLeverage(
+      apiKey,
+      apiSecret,
+      params.useTestnet,
+      params.symbol,
+      params.leverage,
+    );
     await this.applyExchangeFilters(params, params.useTestnet);
 
     const queryParams: Record<string, string | number> = {
       symbol: params.symbol,
       side: params.side,
-      type: params.type,
+      type: params.type || OrderType.LIMIT,
       quantity: params.quantity,
+      timeInForce: params.timeInForce || TimeInForce.GTC,
     };
 
     if (params.type === OrderType.LIMIT) {
       if (!params.price) throw new Error("Price is required for LIMIT orders");
       queryParams.price = params.price;
-      queryParams.timeInForce = TimeInForce.GTC;
+    } else if (params.type === OrderType.MARKET) {
+      queryParams.quantity = params.quantity;
     }
 
     return this.makeSignedRequest(
@@ -253,27 +331,34 @@ export class BinanceService {
   async placeTakeProfitOrder(
     apiKey: string,
     apiSecret: string,
-    params: TakeProfitParams,
+    params: TPSLParams,
   ) {
+    if (!params.quantity && !params.closePosition) {
+      throw Object.assign(
+        new Error(
+          "Either quantity or closePosition must be provided for a Take Profit order.",
+        ),
+        { status: 400 },
+      );
+    }
+
     await this.applyExchangeFilters(params, params.useTestnet);
 
     const queryParams: Record<string, string | number | boolean> = {
       symbol: params.symbol,
-      side: params.side,
+      side: params.side === OrderSide.BUY ? OrderSide.SELL : OrderSide.BUY,
       type: OrderType.TAKE_PROFIT_MARKET,
-      triggerPrice: params.stopPrice,
-      algoType: "CONDITIONAL",
+      triggerPrice: params.triggerPrice,
     };
 
     if (params.closePosition) {
       queryParams.closePosition = true;
-    } else if (params.quantity) {
+      queryParams.algoType = "CONDITIONAL";
+    } else if (params.quantity !== undefined) {
       queryParams.quantity = params.quantity;
-    } else {
-      throw new Error(
-        "Either quantity or closePosition must be provided for a Take Profit order",
-      );
     }
+
+    if (params.workingType) queryParams.workingType = params.workingType;
 
     return this.makeSignedRequest(
       apiKey,
@@ -288,27 +373,34 @@ export class BinanceService {
   async placeStopLossOrder(
     apiKey: string,
     apiSecret: string,
-    params: TakeProfitParams,
+    params: TPSLParams,
   ) {
+    if (!params.quantity && !params.closePosition) {
+      throw Object.assign(
+        new Error(
+          "Either quantity or closePosition must be provided for a Stop Loss order.",
+        ),
+        { status: 400 },
+      );
+    }
+
     await this.applyExchangeFilters(params, params.useTestnet);
 
     const queryParams: Record<string, string | number | boolean> = {
       symbol: params.symbol,
       side: params.side,
       type: OrderType.STOP_MARKET,
-      triggerPrice: params.stopPrice,
-      algoType: "CONDITIONAL",
+      triggerPrice: params.triggerPrice,
     };
 
     if (params.closePosition) {
       queryParams.closePosition = true;
-    } else if (params.quantity) {
+      queryParams.algoType = "CONDITIONAL";
+    } else if (params.quantity !== undefined) {
       queryParams.quantity = params.quantity;
-    } else {
-      throw new Error(
-        "Either quantity or closePosition must be provided for a Stop Loss order",
-      );
     }
+
+    if (params.workingType) queryParams.workingType = params.workingType;
 
     return this.makeSignedRequest(
       apiKey,
@@ -320,38 +412,76 @@ export class BinanceService {
     );
   }
 
-  async getOpenOrders(
-    apiKey: string,
-    apiSecret: string,
-    useTestnet: boolean,
-    symbol?: string,
-  ) {
-    const queryParams: Record<string, string> = {};
-    if (symbol) queryParams.symbol = symbol;
+  async closePosition(apiKey: string, apiSecret: string, params: TPSLParams) {
+    const positions = await this.makeSignedRequest(
+      apiKey,
+      apiSecret,
+      params.useTestnet,
+      "GET",
+      BINANCE_ENDPOINTS.FUTURES_POSITIONS,
+      { symbol: params.symbol },
+    );
+
+    const position = Array.isArray(positions)
+      ? positions.find(
+          (p: any) => p.symbol.toUpperCase() === params.symbol.toUpperCase(),
+        )
+      : null;
+
+    const positionAmt = parseFloat(position?.positionAmt ?? "0");
+    if (!positionAmt || positionAmt === 0) {
+      throw Object.assign(
+        new Error(`No open position found for ${params.symbol}.`),
+        { status: 400 },
+      );
+    }
+
+    const quantity = Math.abs(positionAmt);
+
+    const queryParams: Record<string, string | number> = {
+      symbol: params.symbol,
+      side: params.side,
+      type: OrderType.MARKET,
+      quantity,
+      reduceOnly: "true",
+    };
+
     return this.makeSignedRequest(
       apiKey,
       apiSecret,
-      useTestnet,
-      "GET",
-      BINANCE_ENDPOINTS.FUTURES_OPEN_ORDERS,
+      params.useTestnet,
+      "POST",
+      BINANCE_ENDPOINTS.FUTURES_ORDER,
       queryParams,
     );
   }
 
-  async getOpenAlgoOrders(
+  async cancelTpSl(
     apiKey: string,
     apiSecret: string,
-    useTestnet: boolean,
-    symbol?: string,
+    params: CancelTpSlParams,
   ) {
-    const queryParams: Record<string, string> = {};
-    if (symbol) queryParams.symbol = symbol;
+    if (!params.algoId) {
+      throw Object.assign(new Error("Algo ID is required."), { status: 400 });
+    }
+
+    if (!params.clientAlgoId) {
+      throw Object.assign(new Error("Client Algo ID is required."), {
+        status: 400,
+      });
+    }
+
+    const queryParams: Record<string, number | string> = {
+      algoId: params.algoId,
+      clientAlgoId: params.clientAlgoId,
+    };
+
     return this.makeSignedRequest(
       apiKey,
       apiSecret,
-      useTestnet,
-      "GET",
-      BINANCE_ENDPOINTS.FUTURES_OPEN_ALGO_ORDERS,
+      params.useTestnet,
+      "DELETE",
+      BINANCE_ENDPOINTS.FUTURES_ALGO_ORDER,
       queryParams,
     );
   }

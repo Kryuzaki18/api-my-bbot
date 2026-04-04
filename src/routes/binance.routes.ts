@@ -1,14 +1,17 @@
 import { type FastifyInstance, type FastifyPluginAsync } from "fastify";
 import { Type } from "@sinclair/typebox";
 
-import { BinanceService } from "../services/binance.service.js";
 import { ROUTES } from "../config/app-routes.js";
+import { BinanceService } from "../services/binance.service.js";
 
-const UserInfoSchema = {
+const LeverageBracketSchema = {
   description:
-    "Fetches account information and balances for the authenticated user from Binance futures API.",
-  tags: ["User Info"],
+    "Get the user's current leverage brackets for a specific symbol.",
+  tags: ["Orders"],
   security: [{ bearerAuth: [] }],
+  body: Type.Object({
+    symbol: Type.Optional(Type.String({ minLength: 1, examples: ["BTCUSDT"] })),
+  }),
   response: {
     200: Type.Any(),
     400: Type.Object({
@@ -22,7 +25,7 @@ const UserInfoSchema = {
   },
 };
 
-const userInfoRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
+const binanceRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   const binanceService = new BinanceService();
 
   fastify.addHook("onRequest", async (request, reply) => {
@@ -33,17 +36,24 @@ const userInfoRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     }
   });
 
-  fastify.get(
-    ROUTES.USER_INFO,
-    { schema: UserInfoSchema },
+  fastify.post(
+    ROUTES.FUTURES_LEVERAGE_BRACKET,
+    { schema: LeverageBracketSchema },
     async (request, reply) => {
       try {
+        const body = request.body as any;
         const { apiKey, apiSecret, useTestnet } = request.user;
+        body.useTestnet = useTestnet;
 
-        const result = await binanceService.getAccountInformation(
+        if (body.symbol) {
+          body.symbol = body.symbol?.toUpperCase();
+        }
+
+        const result = await binanceService.getLeverageBracket(
           apiKey,
           apiSecret,
-          useTestnet,
+          body.useTestnet,
+          body.symbol,
         );
         return reply.code(200).send(result);
       } catch (error: any) {
@@ -60,4 +70,4 @@ const userInfoRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   );
 };
 
-export default userInfoRoutes;
+export default binanceRoutes;

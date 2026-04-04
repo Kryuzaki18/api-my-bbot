@@ -21,13 +21,14 @@ declare module "@fastify/jwt" {
 
 export function buildApp(): FastifyInstance {
   const app = fastify({
-    // logger: true,
+    logger: true,
   }).withTypeProvider<TypeBoxTypeProvider>();
 
   app.register(configEnv);
 
   app.register(fastifyCors, {
     origin: "*", // For development. Change App URL in Prod
+    // origin: "http://localhost:4200", // For development. Change App URL in Prod
   });
 
   app.after(async () => {
@@ -57,6 +58,10 @@ export function buildApp(): FastifyInstance {
 
     await app.register(fastifySwaggerUi, {
       routePrefix: "/docs",
+    });
+
+    app.get('/swagger.json', async (request, reply) => {
+      return app.swagger(); 
     });
 
     app.register(appRoutes);
