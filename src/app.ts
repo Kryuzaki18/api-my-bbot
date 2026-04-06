@@ -29,6 +29,8 @@ export function buildApp(): FastifyInstance {
   app.register(fastifyCors, {
     origin: "*", // For development. Change App URL in Prod
     // origin: "http://localhost:4200", // For development. Change App URL in Prod
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   });
 
   app.after(async () => {
