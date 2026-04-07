@@ -1,6 +1,7 @@
 import fastify, { type FastifyInstance } from "fastify";
 import fastifyCors from "@fastify/cors";
 import fastifyJwt from "@fastify/jwt";
+import fastifyCookie from "@fastify/cookie";
 import { type TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 
 import fastifySwagger from "@fastify/swagger";
@@ -8,6 +9,8 @@ import fastifySwaggerUi from "@fastify/swagger-ui";
 
 import configEnv from "./config/app-env.js";
 import appRoutes from "./routes/index.js";
+import { connectDB } from "./config/db.js";
+import { runSeed } from "./seeds/users.seed.js";
 
 declare module "@fastify/jwt" {
   interface FastifyJWT {
@@ -26,18 +29,29 @@ export function buildApp(): FastifyInstance {
 
   app.register(configEnv);
 
-  app.register(fastifyCors, {
-    origin: "*", // For development. Change App URL in Prod
-    // origin: "http://localhost:4200", // For development. Change App URL in Prod
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  });
-
   app.after(async () => {
-    app.register(fastifyJwt, {
-      secret: app.config.JWT_SECRET,
+    app.register(fastifyCors, {
+      origin: app.config.CLIENT_ORIGIN,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+      credentials: true, // Required for cookies to be sent cross-origin
     });
 
+    app.register(fastifyCookie, {
+      secret: app.config.COOKIE_SECRET,
+      hook: "onRequest",
+      parseOptions: {},
+    });
+
+    app.register(fastifyJwt, {
+      secret: app.config.JWT_SECRET,
+      cookie: {
+        cookieName: "session",
+        signed: false,
+      },
+    });
+
+    // Swagger docs
     await app.register(fastifySwagger, {
       openapi: {
         info: {
@@ -62,9 +76,15 @@ export function buildApp(): FastifyInstance {
       routePrefix: "/docs",
     });
 
-    app.get('/swagger.json', async (request, reply) => {
-      return app.swagger(); 
+    app.get("/swagger.json", async (request, reply) => {
+      return app.swagger();
     });
+
+    connectDB(app.config.MONGODB_URI).catch((err) => {
+      app.log.error({ err }, "[MongoDB] Failed to connect");
+    });
+
+    // runSeed();
 
     app.register(appRoutes);
   });

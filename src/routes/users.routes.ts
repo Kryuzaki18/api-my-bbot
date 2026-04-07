@@ -4,7 +4,7 @@ import { Type } from "@sinclair/typebox";
 import { BinanceService } from "../services/binance.service.js";
 import { ROUTES } from "../config/app-routes.js";
 
-const UserInfoSchema = {
+const UsersInfoSchema = {
   description:
     "Fetches account information and balances for the authenticated user from Binance futures API.",
   tags: ["User Info"],
@@ -22,7 +22,7 @@ const UserInfoSchema = {
   },
 };
 
-const userInfoRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
+const usersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   const binanceService = new BinanceService();
 
   fastify.addHook("onRequest", async (request, reply) => {
@@ -35,7 +35,7 @@ const userInfoRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
 
   fastify.get(
     ROUTES.USER_INFO,
-    { schema: UserInfoSchema },
+    { schema: UsersInfoSchema },
     async (request, reply) => {
       try {
         const { apiKey, apiSecret, useTestnet } = request.user;
@@ -60,4 +60,4 @@ const userInfoRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   );
 };
 
-export default userInfoRoutes;
+export default usersRoutes;

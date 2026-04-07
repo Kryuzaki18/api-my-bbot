@@ -1,6 +1,9 @@
 export const ROUTES = {
+  SIGN_UP: '/api/auth/signup',
   SIGN_IN: '/api/auth/signin',
+  SIGN_IN_EMAIL: '/api/auth/signin-email',
   SIGN_OUT: '/api/auth/signout',
+  ME: '/api/auth/me',
   USER_INFO: '/api/user-info',
   USER_STREAM: '/api/user-stream',
   FUTURES_ORDER: '/api/futures/order',
@@ -14,4 +17,3 @@ export const ROUTES = {
   FUTURES_CANCEL_TPSL: '/api/futures/cancel-tpsl',
   FUTURES_LEVERAGE_BRACKET: '/api/futures/leverage-bracket',
 };
-
