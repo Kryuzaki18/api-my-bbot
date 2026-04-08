@@ -25,9 +25,13 @@ const SignupSchema = {
     "Registers a new user. Validates email format, username/email uniqueness, and hashes the password with bcrypt before persisting.",
   tags: ["Authentication"],
   body: Type.Object({
-    username: Type.String({ minLength: 3, maxLength: 30 }),
-    email: Type.String({ format: "email" }),
-    password: Type.String({ minLength: 8 }),
+    username: Type.String({ minLength: 3, maxLength: 50 }),
+    email: Type.String({
+      minLength: 10,
+      maxLength: 100,
+      pattern: EMAIL_REGEX.source,
+    }),
+    password: Type.String({ minLength: 7 }),
     apiKey: Type.String({ minLength: 10 }),
     apiSecret: Type.String({ minLength: 10 }),
   }),
@@ -57,9 +61,7 @@ const MeSchema = {
   tags: ["Authentication"],
   security: [{ cookieAuth: [] }],
   response: {
-    200: Type.Object({
-      username: Type.String(),
-    }),
+    200: Type.Boolean(),
     401: Type.Object({
       error: Type.String(),
     }),
@@ -78,7 +80,6 @@ const SigninSchema = {
   response: {
     200: Type.Object({
       message: Type.String(),
-      useTestnet: Type.Boolean(),
     }),
     400: Type.Object({
       error: Type.String(),
@@ -95,14 +96,17 @@ const SigninEmailSchema = {
     "Verifies user credentials by fetching account details and issues a secure httpOnly session cookie.",
   tags: ["Authentication"],
   body: Type.Object({
-    email: Type.String({ minLength: 10 }),
-    password: Type.String({ minLength: 8 }),
+    email: Type.String({
+      minLength: 10,
+      maxLength: 100,
+      pattern: EMAIL_REGEX.source,
+    }),
+    password: Type.String({ minLength: 7 }),
     useTestnet: Type.Boolean({ default: true }),
   }),
   response: {
     200: Type.Object({
       message: Type.String(),
-      username: Type.String(),
     }),
     400: Type.Object({
       error: Type.String(),
@@ -201,9 +205,9 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
       const { apiKey } = request.user;
       const user = await User.findOne({ apiKey }).lean();
       if (!user) {
-        return reply.code(401).send({ error: "Session expired or invalid" });
+        return reply.code(401).send(false);
       }
-      return reply.code(200).send({ username: user.username });
+      return reply.code(200).send(true);
     } catch {
       return reply.code(401).send({ error: "Session expired or invalid" });
     }
@@ -232,9 +236,7 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         );
 
         reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
-        return reply
-          .code(200)
-          .send({ message: "Signed in successfully", useTestnet });
+        return reply.code(200).send({ message: "Signed in successfully" });
       } catch (error: any) {
         if (error.status && error.status >= 400 && error.status < 500) {
           const msg = error.details?.msg || "Invalid API Keys or unauthorized.";
@@ -268,6 +270,7 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         const user = await User.findOne({
           email: email.toLowerCase().trim(),
         }).lean();
+
         if (!user) {
           return reply.code(401).send({ error: "Invalid email or password" });
         }
@@ -283,9 +286,7 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         );
 
         reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
-        return reply
-          .code(200)
-          .send({ message: "Signed in successfully", username: user.username });
+        return reply.code(200).send({ message: "Signed in successfully" });
       } catch (error: any) {
         if (error.status && error.status >= 400 && error.status < 500) {
           const msg = error.details?.msg || "Invalid API Keys or unauthorized.";

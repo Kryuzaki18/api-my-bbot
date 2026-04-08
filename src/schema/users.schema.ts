@@ -18,7 +18,7 @@ const UserSchema: Schema = new Schema(
       unique: true,
       trim: true,
       minlength: [3, "Username must be at least 3 characters"],
-      maxlength: [30, "Username must be at most 30 characters"],
+      maxlength: [50, "Username must be at most 50 characters"],
     },
     email: {
       type: String,
@@ -26,19 +26,23 @@ const UserSchema: Schema = new Schema(
       unique: true,
       lowercase: true,
       trim: true,
+      minlength: [10, "Email must be at least 10 characters"],
+      maxlength: [100, "Email must be at most 100 characters"],
     },
     password: {
       type: String,
       required: [true, "Password is required"],
-      minlength: [8, "Password must be at least 8 characters"],
+      minlength: [7, "Password must be at least 7 characters"],
     },
     apiKey: {
       type: String,
       required: [true, "Binance API key is required"],
+      minlength: [10, "Binance API key must be at least 10 characters"],
     },
     apiSecret: {
       type: String,
       required: [true, "Binance API secret is required"],
+      minlength: [10, "Binance API secret must be at least 10 characters"],
     },
   },
   { timestamps: true },

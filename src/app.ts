@@ -10,7 +10,7 @@ import fastifySwaggerUi from "@fastify/swagger-ui";
 import configEnv from "./config/app-env.js";
 import appRoutes from "./routes/index.js";
 import { connectDB } from "./config/db.js";
-import { runSeed } from "./seeds/users.seed.js";
+import { COOKIE_NAME } from "./constants/auth.constants.js";
 
 declare module "@fastify/jwt" {
   interface FastifyJWT {
@@ -46,7 +46,7 @@ export function buildApp(): FastifyInstance {
     app.register(fastifyJwt, {
       secret: app.config.JWT_SECRET,
       cookie: {
-        cookieName: "session",
+        cookieName: COOKIE_NAME,
         signed: false,
       },
     });
@@ -83,8 +83,6 @@ export function buildApp(): FastifyInstance {
     connectDB(app.config.MONGODB_URI).catch((err) => {
       app.log.error({ err }, "[MongoDB] Failed to connect");
     });
-
-    // runSeed();
 
     app.register(appRoutes);
   });
