@@ -15,8 +15,9 @@ import { COOKIE_NAME } from "./constants/auth.constants.js";
 declare module "@fastify/jwt" {
   interface FastifyJWT {
     payload: {
-      apiKey: string;
-      apiSecret: string;
+      email?: string;
+      apiKey?: string;
+      apiSecret?: string;
       useTestnet: boolean;
     };
   }

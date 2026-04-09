@@ -25,21 +25,26 @@ const SignupSchema = {
     "Registers a new user. Validates email format, username/email uniqueness, and hashes the password with bcrypt before persisting.",
   tags: ["Authentication"],
   body: Type.Object({
-    username: Type.String({ minLength: 3, maxLength: 50 }),
     email: Type.String({
       minLength: 10,
       maxLength: 100,
       pattern: EMAIL_REGEX.source,
     }),
     password: Type.String({ minLength: 7 }),
-    apiKey: Type.String({ minLength: 10 }),
-    apiSecret: Type.String({ minLength: 10 }),
+    binanceKeys: Type.Object({
+      test: Type.Object({
+        apiKey: Type.String({ minLength: 10 }),
+        apiSecret: Type.String({ minLength: 10 }),
+      }),
+      prod: Type.Object({
+        apiKey: Type.String({ minLength: 10 }),
+        apiSecret: Type.String({ minLength: 10 }),
+      }),
+    }),
   }),
   response: {
     201: Type.Object({
       message: Type.String(),
-      username: Type.String(),
-      email: Type.String(),
     }),
     409: Type.Object({
       error: Type.String(),
@@ -135,33 +140,32 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     ROUTES.SIGN_UP,
     { schema: SignupSchema },
     async (request, reply) => {
-      const { username, email, password, apiKey, apiSecret } = request.body as {
-        username: string;
+      const { email, password, binanceKeys } = request.body as {
         email: string;
         password: string;
-        apiKey: string;
-        apiSecret: string;
+        binanceKeys: {
+          test: {
+            apiKey: string;
+            apiSecret: string;
+          };
+          prod: {
+            apiKey: string;
+            apiSecret: string;
+          };
+        };
       };
 
       if (!EMAIL_REGEX.test(email)) {
         return reply.code(422).send({ error: "Invalid email address format" });
       }
 
-      const [existingByUsername, existingByEmail] = await Promise.all([
-        User.findOne({ username: username.trim() }).lean(),
-        User.findOne({ email: email.toLowerCase().trim() }).lean(),
-      ]);
-
-      if (existingByUsername) {
-        return reply.code(409).send({
-          error: "Username is already taken",
-          field: "username",
-        });
-      }
+      const existingByEmail = await User.findOne({
+        email: email.toLowerCase().trim(),
+      }).lean();
 
       if (existingByEmail) {
         return reply.code(409).send({
-          error: "Email address is already registered",
+          error: "Email address is already taken",
           field: "email",
         });
       }
@@ -169,18 +173,23 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
       const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
       try {
-        const user = await User.create({
-          username: username.trim(),
+        await User.create({
           email: email.toLowerCase().trim(),
           password: hashedPassword,
-          apiKey,
-          apiSecret,
+          binanceKeys: {
+            test: {
+              apiKey: binanceKeys.test.apiKey,
+              apiSecret: binanceKeys.test.apiSecret,
+            },
+            prod: {
+              apiKey: binanceKeys.prod.apiKey,
+              apiSecret: binanceKeys.prod.apiSecret,
+            },
+          },
         });
 
         return reply.code(201).send({
           message: "Account created successfully",
-          username: user.username,
-          email: user.email,
         });
       } catch (error: any) {
         if (error.code === 11000) {
@@ -202,8 +211,18 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   fastify.get(ROUTES.ME, { schema: MeSchema }, async (request, reply) => {
     try {
       await request.jwtVerify();
-      const { apiKey } = request.user;
-      const user = await User.findOne({ apiKey }).lean();
+      const { email, apiKey } = request.user;
+      let user = null;
+      if (email) {
+        user = await User.findOne({ email }).lean();
+      } else if (apiKey) {
+        user = await User.findOne({
+          $or: [
+            { "binanceKeys.test.apiKey": apiKey },
+            { "binanceKeys.prod.apiKey": apiKey },
+          ],
+        }).lean();
+      }
       if (!user) {
         return reply.code(401).send(false);
       }
@@ -281,7 +300,7 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         }
 
         const token = fastify.jwt.sign(
-          { apiKey: user.apiKey, apiSecret: user.apiSecret, useTestnet },
+          { email: user.email, useTestnet },
           { expiresIn: "7d" },
         );
 

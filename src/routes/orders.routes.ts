@@ -4,6 +4,7 @@ import { Type } from "@sinclair/typebox";
 import { ROUTES } from "../config/app-routes.js";
 import { BinanceService } from "../services/binance.service.js";
 import { OrderSide, OrderType, WorkingType } from "../models/order.model.js";
+import User from "../schema/users.schema.js";
 
 const OpenOrdersSchema = {
   description: "Fetches open orders securely on Binance futures.",
@@ -172,6 +173,23 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   fastify.addHook("onRequest", async (request, reply) => {
     try {
       await request.jwtVerify();
+      if (request.user?.email) {
+        const userDB = await User.findOne({ email: request.user.email }).lean();
+        if (!userDB) throw new Error("Invalid session user");
+        
+        let useTestnet = request.user.useTestnet;
+        if (request.body && typeof (request.body as any).useTestnet === "boolean") {
+          useTestnet = (request.body as any).useTestnet;
+          request.user.useTestnet = useTestnet;
+        } else if (request.query && typeof (request.query as any).useTestnet === "string") {
+          useTestnet = (request.query as any).useTestnet === "true";
+          request.user.useTestnet = useTestnet;
+        }
+
+        const keys = useTestnet ? userDB.binanceKeys.test : userDB.binanceKeys.prod;
+        request.user.apiKey = keys.apiKey;
+        request.user.apiSecret = keys.apiSecret;
+      }
     } catch (err) {
       reply.send(err);
     }
@@ -182,7 +200,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     { schema: OpenOrdersSchema },
     async (request, reply) => {
       try {
-        const { apiKey, apiSecret, useTestnet } = request.user;
+        const { apiKey, apiSecret, useTestnet } = request.user as any;
         const result = await binanceService.getFuturesPositions(
           apiKey,
           apiSecret,
@@ -208,7 +226,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     async (request, reply) => {
       try {
         const { symbol } = request.query as any;
-        const { apiKey, apiSecret, useTestnet } = request.user;
+        const { apiKey, apiSecret, useTestnet } = request.user as any;
 
         const result = await binanceService.getOpenOrders(
           apiKey,
@@ -236,7 +254,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     async (request, reply) => {
       try {
         const { symbol } = request.query as any;
-        const { apiKey, apiSecret, useTestnet } = request.user;
+        const { apiKey, apiSecret, useTestnet } = request.user as any;
 
         const result = await binanceService.getPendingTpSl(
           apiKey,
@@ -264,7 +282,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     async (request, reply) => {
       try {
         const body = request.body as any;
-        const { apiKey, apiSecret, useTestnet } = request.user;
+        const { apiKey, apiSecret, useTestnet } = request.user as any;
         body.useTestnet = useTestnet;
         body.symbol = body.symbol?.toUpperCase();
 
@@ -289,7 +307,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     async (request, reply) => {
       try {
         const body = request.body as any;
-        const { apiKey, apiSecret, useTestnet } = request.user;
+        const { apiKey, apiSecret, useTestnet } = request.user as any;
         body.useTestnet = useTestnet;
         body.symbol = body.symbol?.toUpperCase();
 
@@ -318,7 +336,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     async (request, reply) => {
       try {
         const body = request.body as any;
-        const { apiKey, apiSecret, useTestnet } = request.user;
+        const { apiKey, apiSecret, useTestnet } = request.user as any;
         body.useTestnet = useTestnet;
         body.symbol = body.symbol?.toUpperCase();
 
@@ -347,7 +365,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     async (request, reply) => {
       try {
         const body = request.body as any;
-        const { apiKey, apiSecret, useTestnet } = request.user;
+        const { apiKey, apiSecret, useTestnet } = request.user as any;
         body.useTestnet = useTestnet;
         body.symbol = body.symbol?.toUpperCase();
 
@@ -376,7 +394,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     async (request, reply) => {
       try {
         const body = request.body as any;
-        const { apiKey, apiSecret, useTestnet } = request.user;
+        const { apiKey, apiSecret, useTestnet } = request.user as any;
         body.useTestnet = useTestnet;
 
         const result = await binanceService.cancelTpSl(
@@ -404,7 +422,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     async (request, reply) => {
       try {
         const body = request.body as any;
-        const { apiKey, apiSecret, useTestnet } = request.user;
+        const { apiKey, apiSecret, useTestnet } = request.user as any;
         body.useTestnet = useTestnet;
         body.symbol = body.symbol?.toUpperCase();
 

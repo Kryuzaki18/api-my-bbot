@@ -3,6 +3,7 @@ import { Type } from "@sinclair/typebox";
 
 import { BinanceService } from "../services/binance.service.js";
 import { ROUTES } from "../config/app-routes.js";
+import User from "../schema/users.schema.js";
 
 const GetStreamSchema = {
   description: "Starts a new user data stream and returns a listenKey.",
@@ -48,6 +49,23 @@ const userStreamRoutes: FastifyPluginAsync = async (
   fastify.addHook("onRequest", async (request, reply) => {
     try {
       await request.jwtVerify();
+      if (request.user?.email) {
+        const userDB = await User.findOne({ email: request.user.email }).lean();
+        if (!userDB) throw new Error("Invalid session user");
+        
+        let useTestnet = request.user.useTestnet;
+        if (request.body && typeof (request.body as any).useTestnet === "boolean") {
+          useTestnet = (request.body as any).useTestnet;
+          request.user.useTestnet = useTestnet;
+        } else if (request.query && typeof (request.query as any).useTestnet === "string") {
+          useTestnet = (request.query as any).useTestnet === "true";
+          request.user.useTestnet = useTestnet;
+        }
+
+        const keys = useTestnet ? userDB.binanceKeys.test : userDB.binanceKeys.prod;
+        request.user.apiKey = keys.apiKey;
+        request.user.apiSecret = keys.apiSecret;
+      }
     } catch (err) {
       reply.send(err);
     }
@@ -58,7 +76,7 @@ const userStreamRoutes: FastifyPluginAsync = async (
     { schema: GetStreamSchema },
     async (request, reply) => {
       try {
-        const { apiKey, useTestnet } = request.user;
+        const { apiKey, useTestnet } = request.user as any;
         const result = await binanceService.getListenKey(apiKey, useTestnet);
         return reply.code(200).send(result);
       } catch (error: any) {
@@ -78,7 +96,7 @@ const userStreamRoutes: FastifyPluginAsync = async (
     { schema: KeepAliveStreamSchema },
     async (request, reply) => {
       try {
-        const { apiKey, useTestnet } = request.user;
+        const { apiKey, useTestnet } = request.user as any;
         const result = await binanceService.keepAliveListenKey(
           apiKey,
           useTestnet,
@@ -101,7 +119,7 @@ const userStreamRoutes: FastifyPluginAsync = async (
     { schema: CloseStreamSchema },
     async (request, reply) => {
       try {
-        const { apiKey, useTestnet } = request.user;
+        const { apiKey, useTestnet } = request.user as any;
         const result = await binanceService.closeListenKey(apiKey, useTestnet);
         return reply.code(200).send(result);
       } catch (error: any) {

@@ -22,7 +22,7 @@ export class BinanceService {
     return useTestnet ? BINANCE_FUTURES_TESTNET_URL : BINANCE_FUTURES_PROD_URL;
   }
 
-  // A generic wrapper to handle Binance HMAC SHA-256 signatures, timestamps, and HTTP requests
+  // HMAC SHA-256 signatures, timestamps, and HTTP requests
   private async makeSignedRequest(
     apiKey: string,
     apiSecret: string,
@@ -65,7 +65,6 @@ export class BinanceService {
     return responseData;
   }
 
-  // A generic wrapper for Binance requests that only require an API Key
   private async makeApiRequest(
     apiKey: string,
     useTestnet: boolean,
