@@ -492,8 +492,12 @@ export class BinanceService {
   ) {
     const queryParams: Record<string, string | number> = {
       symbol: params.symbol,
-      orderId: params.orderId,
     };
+    if (params.origClientOrderId) {
+      queryParams.origClientOrderId = params.origClientOrderId;
+    } else if (params.orderId) {
+      queryParams.orderId = params.orderId;
+    }
 
     return this.makeSignedRequest(
       apiKey,

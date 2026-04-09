@@ -59,6 +59,7 @@ export interface CancelTpSlParams {
 
 export interface CancelOrderParams {
   symbol: string;
-  orderId: number;
+  orderId?: number | string;
+  origClientOrderId?: string;
   useTestnet: boolean;
 }

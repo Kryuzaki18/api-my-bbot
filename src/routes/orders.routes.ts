@@ -152,7 +152,8 @@ const CancelOrderSchema = {
   security: [{ bearerAuth: [] }],
   body: Type.Object({
     symbol: Type.String({ minLength: 1, examples: ["BTCUSDT"] }),
-    orderId: Type.Number(),
+    orderId: Type.Optional(Type.Union([Type.Number(), Type.String()])),
+    origClientOrderId: Type.Optional(Type.String()),
   }),
   response: {
     200: Type.Any(),
