@@ -5,7 +5,7 @@ import { BinanceService } from "../services/binance.service.js";
 import { ROUTES } from "../config/app-routes.js";
 import User from "../schema/users.schema.js";
 
-const GetStreamSchema = {
+const GetUserStreamSchema = {
   description: "Starts a new user data stream and returns a listenKey.",
   tags: ["User Stream"],
   security: [{ bearerAuth: [] }],
@@ -18,7 +18,7 @@ const GetStreamSchema = {
   },
 };
 
-const KeepAliveStreamSchema = {
+const KeepAliveUserStreamSchema = {
   description:
     "Pings a listenKey to keep it alive. Should be called every 30 minutes.",
   tags: ["User Stream"],
@@ -30,7 +30,7 @@ const KeepAliveStreamSchema = {
   },
 };
 
-const CloseStreamSchema = {
+const CloseUserStreamSchema = {
   description: "Closes out a user data stream.",
   tags: ["User Stream"],
   security: [{ bearerAuth: [] }],
@@ -73,7 +73,7 @@ const userStreamRoutes: FastifyPluginAsync = async (
 
   fastify.post(
     ROUTES.USER_STREAM,
-    { schema: GetStreamSchema },
+    { schema: GetUserStreamSchema },
     async (request, reply) => {
       try {
         const { apiKey, useTestnet } = request.user as any;
@@ -93,7 +93,7 @@ const userStreamRoutes: FastifyPluginAsync = async (
 
   fastify.put(
     ROUTES.USER_STREAM,
-    { schema: KeepAliveStreamSchema },
+    { schema: KeepAliveUserStreamSchema },
     async (request, reply) => {
       try {
         const { apiKey, useTestnet } = request.user as any;
@@ -116,7 +116,7 @@ const userStreamRoutes: FastifyPluginAsync = async (
 
   fastify.delete(
     ROUTES.USER_STREAM,
-    { schema: CloseStreamSchema },
+    { schema: CloseUserStreamSchema },
     async (request, reply) => {
       try {
         const { apiKey, useTestnet } = request.user as any;

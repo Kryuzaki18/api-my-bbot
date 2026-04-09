@@ -305,7 +305,7 @@ export class BinanceService {
     const queryParams: Record<string, string | number> = {
       symbol: params.symbol,
       side: params.side,
-      type: params.type || OrderType.LIMIT,
+      type: params.type,
       quantity: params.quantity,
       timeInForce: params.timeInForce || TimeInForce.GTC,
     };
@@ -315,6 +315,7 @@ export class BinanceService {
       queryParams.price = params.price;
     } else if (params.type === OrderType.MARKET) {
       queryParams.quantity = params.quantity;
+      delete queryParams.timeInForce;
     }
 
     return this.makeSignedRequest(
