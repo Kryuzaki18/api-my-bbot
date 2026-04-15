@@ -16,4 +16,5 @@ export const ROUTES = {
   FUTURES_CLOSE_POSITION: '/api/futures/close-position',
   FUTURES_CANCEL_TPSL: '/api/futures/cancel-tpsl',
   FUTURES_LEVERAGE_BRACKET: '/api/futures/leverage-bracket',
+  FUTURES_COMMISSION_RATE: '/api/futures/commission-rate',
 };

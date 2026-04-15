@@ -37,9 +37,11 @@ export class BinanceService {
     queryParams.timestamp = Date.now();
 
     const queryString = new URLSearchParams(queryParams as any).toString();
+    
     const signature = createHmac("sha256", apiSecret)
       .update(queryString)
       .digest("hex");
+
     const finalQueryString = `${queryString}&signature=${signature}`;
 
     const { statusCode, body } = await request(
@@ -199,6 +201,34 @@ export class BinanceService {
         symbol: symbol || "",
       },
     );
+  }
+
+async getCommissionRate(
+    apiKey: string,
+    apiSecret: string,
+    useTestnet: boolean,
+    symbols?: string[],
+  ) {
+
+    const commissionRates = [];
+
+    if (symbols && symbols.length > 0) {
+      for (const symbol of symbols) {
+        const commissionRate = await this.makeSignedRequest(
+          apiKey,
+          apiSecret,
+          useTestnet,
+          "GET",
+          BINANCE_ENDPOINTS.FUTURES_COMMISSION_RATE,
+          {
+            symbol: symbol || "",
+          },
+        );
+        commissionRates.push(commissionRate);
+      }
+    }
+
+    return commissionRates;
   }
 
   async getAccountInformation(

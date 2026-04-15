@@ -319,7 +319,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         );
         return reply.code(200).send(result);
       } catch (error: any) {
-        // request.log.error(error);
+        request.log.error(error);
         if (error.status)
           return reply
             .code(error.status)
@@ -348,7 +348,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         );
         return reply.code(200).send(result);
       } catch (error: any) {
-        // request.log.error(error);
+        request.log.error(error);
         if (error.status)
           return reply
             .code(error.status)
