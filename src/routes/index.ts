@@ -5,6 +5,7 @@ import binanceRoutes from "./binance.routes.js";
 import usersRoutes from "./users.routes.js";
 import ordersRoute from "./orders.routes.js";
 import userStreamRoutes from "./user-stream.routes.js";
+import geminiRoutes from "./gemini.routes.js";
 
 const appRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   fastify.register(authRoutes);
@@ -12,6 +13,8 @@ const appRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   fastify.register(usersRoutes);
   fastify.register(ordersRoute);
   fastify.register(userStreamRoutes);
+  fastify.register(geminiRoutes);
+
 };
 
 export default appRoutes;

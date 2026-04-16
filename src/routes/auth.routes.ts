@@ -6,10 +6,10 @@ import { ROUTES } from "../config/app-routes.js";
 import { BinanceService } from "../services/binance.service.js";
 import {
   COOKIE_NAME,
-  EMAIL_REGEX,
   SALT_ROUNDS,
   SEVEN_DAYS_SECONDS,
-} from "../constants/auth.constants.js";
+} from "../constants/auth.constant.js";
+import { EMAIL_REGEX } from "../constants/regex.constant.js";
 import User from "../schema/users.schema.js";
 
 const cookieOptions = (maxAgeSeconds: number) => ({

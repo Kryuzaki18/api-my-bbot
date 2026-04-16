@@ -10,7 +10,7 @@ import fastifySwaggerUi from "@fastify/swagger-ui";
 import configEnv from "./config/app-env.js";
 import appRoutes from "./routes/index.js";
 import { connectDB } from "./config/db.js";
-import { COOKIE_NAME } from "./constants/auth.constants.js";
+import { COOKIE_NAME } from "./constants/auth.constant.js";
 
 declare module "@fastify/jwt" {
   interface FastifyJWT {

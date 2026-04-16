@@ -1,4 +1,6 @@
 export const ROUTES = {
+  AI_SIGNAL_BASIC: '/api/ai/signal-basic',
+  AI_SIGNAL_PRO: '/api/ai/signal-pro',
   SIGN_UP: '/api/auth/signup',
   SIGN_IN: '/api/auth/signin',
   SIGN_IN_EMAIL: '/api/auth/signin-email',
