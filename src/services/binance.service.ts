@@ -16,13 +16,26 @@ import {
 } from "../models/order.model.js";
 
 export class BinanceService {
-  private static exchangeInfoCache: Record<string, any> = {};
+  private exchangeInfoCache: Record<string, any> = {};
+  private timeOffset: number = 0;
 
-  private static getBaseUrl(useTestnet: boolean) {
+  private getBaseUrl(useTestnet: boolean) {
     return useTestnet ? BINANCE_FUTURES_TESTNET_URL : BINANCE_FUTURES_PROD_URL;
   }
 
-  // HMAC SHA-256 signatures, timestamps, and HTTP requests
+  private async syncTime(useTestnet: boolean) {
+    const baseUrl = this.getBaseUrl(useTestnet);
+    const start = Date.now();
+
+    const res = await request(`${baseUrl}${BINANCE_ENDPOINTS.FUTURES_TIME}`);
+    const data = (await res.body.json()) as { serverTime: number };
+
+    const end = Date.now();
+    const avgLocalTime = (start + end) / 2;
+
+    this.timeOffset = data.serverTime - avgLocalTime - 1000;
+  }
+
   private async makeSignedRequest(
     apiKey: string,
     apiSecret: string,
@@ -31,31 +44,35 @@ export class BinanceService {
     endpoint: string,
     queryParams: Record<string, string | number | boolean> = {},
   ) {
-    const baseUrl = BinanceService.getBaseUrl(useTestnet);
+    const baseUrl = this.getBaseUrl(useTestnet);
 
-    // Binance requires timestamp for signed requests
-    queryParams.timestamp = Date.now();
+    if (this.timeOffset === 0) {
+      await this.syncTime(useTestnet);
+    }
+
+    queryParams.timestamp = Math.floor(Date.now() + this.timeOffset);
 
     const queryString = new URLSearchParams(queryParams as any).toString();
-    
     const signature = createHmac("sha256", apiSecret)
       .update(queryString)
       .digest("hex");
 
-    const finalQueryString = `${queryString}&signature=${signature}`;
+    const finalUrl = `${baseUrl}${endpoint}?${queryString}&signature=${signature}`;
 
-    const { statusCode, body } = await request(
-      `${baseUrl}${endpoint}?${finalQueryString}`,
-      {
-        method,
-        headers: {
-          "X-MBX-APIKEY": apiKey,
-          "Content-Type": "application/json",
-        },
-      },
-    );
+    const { statusCode, body, headers } = await request(finalUrl, {
+      method,
+      headers: { "X-MBX-APIKEY": apiKey },
+    });
 
-    const responseData = await body.json();
+    const contentType = headers["content-type"] || "";
+    let responseData;
+
+    if (contentType.includes("application/json")) {
+      responseData = await body.json();
+    } else {
+      const text = await body.text();
+      throw new Error(`Binance API Error: ${text.substring(0, 100)}`);
+    }
 
     if (statusCode !== 200) {
       throw Object.assign(new Error("Binance API Error"), {
@@ -73,7 +90,7 @@ export class BinanceService {
     method: "GET" | "POST" | "PUT" | "DELETE",
     endpoint: string,
   ) {
-    const baseUrl = BinanceService.getBaseUrl(useTestnet);
+    const baseUrl = this.getBaseUrl(useTestnet);
 
     const { statusCode, body } = await request(`${baseUrl}${endpoint}`, {
       method,
@@ -97,15 +114,15 @@ export class BinanceService {
 
   private async getExchangeInfo(useTestnet: boolean) {
     const cacheKey = useTestnet ? "testnet" : "mainnet";
-    if (!BinanceService.exchangeInfoCache[cacheKey]) {
-      BinanceService.exchangeInfoCache[cacheKey] = await this.makeApiRequest(
+    if (!this.exchangeInfoCache[cacheKey]) {
+      this.exchangeInfoCache[cacheKey] = await this.makeApiRequest(
         "",
         useTestnet,
         "GET",
         BINANCE_ENDPOINTS.FUTURES_EXCHANGE_INFO,
       );
     }
-    return BinanceService.exchangeInfoCache[cacheKey];
+    return this.exchangeInfoCache[cacheKey];
   }
 
   private async applyExchangeFilters(params: any, useTestnet: boolean) {
@@ -203,13 +220,12 @@ export class BinanceService {
     );
   }
 
-async getCommissionRate(
+  async getCommissionRate(
     apiKey: string,
     apiSecret: string,
     useTestnet: boolean,
     symbols?: string[],
   ) {
-
     const commissionRates = [];
 
     if (symbols && symbols.length > 0) {

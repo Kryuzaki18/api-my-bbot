@@ -13,5 +13,6 @@ export const BINANCE_ENDPOINTS = {
   FUTURES_POSITIONS: '/fapi/v2/positionRisk',
   FUTURES_LEVERAGE_BRACKET: '/fapi/v1/leverageBracket',
   FUTURES_COMMISSION_RATE: '/fapi/v1/commissionRate',
+  FUTURES_TIME: '/fapi/v1/time',
 };
 
