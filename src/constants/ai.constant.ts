@@ -154,7 +154,10 @@ ${chatRules.join("\n")}
 ${rules.join("\n")}
 `;
 
-export const AI_CHAT_PROMPTS_TEMPLATE = chatRules.join("\n");
+export const AI_CHAT_PROMPTS_TEMPLATE = `
+${scopes.join("\n")}
+${chatRules.join("\n")}
+`;
 
 export const AI_MODELS = {
   GEMINI_BASIC: "gemini-flash-latest",

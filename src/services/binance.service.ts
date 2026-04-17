@@ -112,6 +112,42 @@ export class BinanceService {
     return responseData;
   }
 
+  async getKlines(symbol: string, interval: string) {
+    const params = {
+      symbol,
+      interval,
+      limit: "150",
+    };
+
+    const queryString = new URLSearchParams(params);
+
+    const finalUrl = `${BINANCE_FUTURES_PROD_URL}${BINANCE_ENDPOINTS.FUTURES_KLINE}?${queryString}`;
+
+    const { statusCode, body } = await request(finalUrl, {
+      method: "GET",
+    });
+
+    if (statusCode !== 200) {
+      throw Object.assign(new Error("API Binance Error"), {
+        status: statusCode,
+        details: "Error Fetching klines",
+      });
+    }
+
+    const responseData = await body.json() as any[];
+    
+    if (responseData?.length > 0) {
+      return responseData?.map((raw: any) => ({
+        open: raw[1],
+        high: raw[2],
+        low: raw[3],
+        close: raw[4],
+      }));
+    }
+
+    return [];
+  }
+
   private async getExchangeInfo(useTestnet: boolean) {
     const cacheKey = useTestnet ? "testnet" : "mainnet";
     if (!this.exchangeInfoCache[cacheKey]) {

@@ -1,8 +1,14 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { AI_MODELS, AI_ANALYZE_MARKET_TEMPLATE, AI_CHAT_PROMPTS_TEMPLATE } from "../constants/ai.constant.js";
+import {
+  AI_MODELS,
+  AI_ANALYZE_MARKET_TEMPLATE,
+  AI_CHAT_PROMPTS_TEMPLATE,
+} from "../constants/ai.constant.js";
 import { RESPONSE_MESSAGES } from "../constants/auth.constant.js";
+import { BinanceService } from "./binance.service.js";
 
 export class GeminiService {
+  binanceService = new BinanceService();
   genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
 
   delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
@@ -46,11 +52,21 @@ export class GeminiService {
     }
   }
 
-  async analyze(symbol: string, timeframe: string,) {
-    const prompt = AI_ANALYZE_MARKET_TEMPLATE;
-    const plan = 0;
-    const proModel = this.genAI.getGenerativeModel({
-      model: !plan ? AI_MODELS.GEMINI_BASIC : AI_MODELS.GEMINI_PRO,
+  async analyze(symbol: string, interval: string, deepAnalyze: number) {
+    const klines = await this.binanceService.getKlines(symbol, interval);
+
+    if (!klines) {
+      throw new Error(RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+    }
+
+    const dataPrompt =
+      `Here is the marketData for ${symbol} with timeframe ${interval}:` +
+      `\n` +
+      JSON.stringify(klines);
+    const prompt = AI_ANALYZE_MARKET_TEMPLATE.concat("\n" + dataPrompt);
+
+    const aiModel = this.genAI.getGenerativeModel({
+      model: deepAnalyze ? AI_MODELS.GEMINI_PRO : AI_MODELS.GEMINI_BASIC,
       generationConfig: {
         responseMimeType: "application/json",
       },
@@ -59,7 +75,7 @@ export class GeminiService {
     let aiText = "";
 
     try {
-      const result = await proModel.generateContent([{ text: prompt }]);
+      const result = await aiModel.generateContent([{ text: prompt }]);
       aiText = result.response.text();
 
       if (!aiText) {
@@ -72,7 +88,7 @@ export class GeminiService {
         // 429 is "Too Many Requests" - Rate limit hit, waiting 30 seconds...
         await this.delay(30000);
 
-        const result = await proModel.generateContent([{ text: prompt }]);
+        const result = await aiModel.generateContent([{ text: prompt }]);
         aiText = result.response.text();
 
         if (!aiText) {
