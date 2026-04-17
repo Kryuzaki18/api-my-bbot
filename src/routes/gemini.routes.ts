@@ -4,9 +4,9 @@ import { Type } from "@sinclair/typebox";
 import { GeminiService } from "../services/gemini.service.js";
 import { ROUTES } from "../config/app-routes.js";
 
-const AISignalBasicSchema = {
-  description: "AI Signal Basic.",
-  tags: ["AI Signal Basic"],
+const AIChatSchema = {
+  description: "AI Chat.",
+  tags: ["AI Chat"],
   body: Type.Object({
     message: Type.String({ minLength: 3 }),
   }),
@@ -23,12 +23,13 @@ const AISignalBasicSchema = {
   },
 };
 
-const AISignalProSchema = {
-  description: "AI Signal Pro.",
-  tags: ["AI Signal Pro"],
-  security: [{ bearerAuth: [] }],
+const AIAnalyzeSchema = {
+  description: "AI Analyze Market.",
+  tags: ["AI Analyze"],
   body: Type.Object({
-    message: Type.String({ minLength: 3 }),
+    symbol: Type.String({ minLength: 3 }),
+    timeframe: Type.String({ minLength: 3 }),
+    plan: Type.Number(),
   }),
   response: {
     200: Type.Any(),
@@ -47,13 +48,17 @@ const geminiRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   const geminiService = new GeminiService();
 
   fastify.post(
-    ROUTES.AI_SIGNAL_BASIC,
-    { schema: AISignalBasicSchema },
+    ROUTES.AI_CHAT,
+    { schema: AIChatSchema },
     async (request, reply) => {
       try {
         const { message } = request.body as any;
 
-        const result = await geminiService.signalBasic(message);
+        if (message === undefined) {
+          return reply.code(400).send({ error: "Invalid request." });
+        }
+
+        const result = await geminiService.chat(message);
         return reply.code(200).send(result);
       } catch (error: any) {
         request.log.error(error);
@@ -65,13 +70,17 @@ const geminiRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   );
 
   fastify.post(
-    ROUTES.AI_SIGNAL_PRO,
-    { schema: AISignalProSchema },
+    ROUTES.AI_ANALYZE_MARKET,
+    { schema: AIAnalyzeSchema },
     async (request, reply) => {
       try {
-        const { message } = request.body as any;
+        const { symbol, timeframe } = request.body as any;
 
-        const result = await geminiService.signalPro(message);
+        if (symbol === undefined || timeframe === undefined) {
+          return reply.code(400).send({ error: "Invalid request." });
+        }
+
+        const result = await geminiService.analyze(symbol, timeframe);
         return reply.code(200).send(result);
       } catch (error: any) {
         request.log.error(error);

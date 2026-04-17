@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { AI_MODELS, AI_PROMPTS_TEMPLATE } from "../constants/ai.constant.js";
+import { AI_MODELS, AI_ANALYZE_MARKET_TEMPLATE, AI_CHAT_PROMPTS_TEMPLATE } from "../constants/ai.constant.js";
 import { RESPONSE_MESSAGES } from "../constants/auth.constant.js";
 
 export class GeminiService {
@@ -7,10 +7,11 @@ export class GeminiService {
 
   delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-  async signalBasic(message: string) {
-    const prompt = AI_PROMPTS_TEMPLATE.concat("\n" + message);
+  async chat(message: string) {
+    const prompt = AI_CHAT_PROMPTS_TEMPLATE.concat("\n" + message);
+    const plan = 0;
     const basicModel = this.genAI.getGenerativeModel({
-      model: AI_MODELS.GEMINI_BASIC,
+      model: !plan ? AI_MODELS.GEMINI_BASIC : AI_MODELS.GEMINI_PRO,
       generationConfig: {
         responseMimeType: "application/json",
       },
@@ -45,10 +46,11 @@ export class GeminiService {
     }
   }
 
-  async signalPro(message: string) {
-    const prompt = AI_PROMPTS_TEMPLATE.concat("\n" + message);
+  async analyze(symbol: string, timeframe: string,) {
+    const prompt = AI_ANALYZE_MARKET_TEMPLATE;
+    const plan = 0;
     const proModel = this.genAI.getGenerativeModel({
-      model: AI_MODELS.GEMINI_PRO,
+      model: !plan ? AI_MODELS.GEMINI_BASIC : AI_MODELS.GEMINI_PRO,
       generationConfig: {
         responseMimeType: "application/json",
       },
