@@ -226,14 +226,12 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     { schema: OpenOrdersSchema },
     async (request, reply) => {
       try {
-        const { symbol } = request.query as any;
         const { apiKey, apiSecret, useTestnet } = request.user as any;
 
         const result = await binanceService.getOpenOrders(
           apiKey,
           apiSecret,
           useTestnet,
-          symbol?.toUpperCase(),
         );
         return reply.code(200).send(result);
       } catch (error: any) {
@@ -254,14 +252,11 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     { schema: OpenOrdersSchema },
     async (request, reply) => {
       try {
-        const { symbol } = request.query as any;
         const { apiKey, apiSecret, useTestnet } = request.user as any;
-
         const result = await binanceService.getPendingTpSl(
           apiKey,
           apiSecret,
           useTestnet,
-          symbol?.toUpperCase(),
         );
         return reply.code(200).send(result);
       } catch (error: any) {

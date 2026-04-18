@@ -342,17 +342,13 @@ export class BinanceService {
     apiKey: string,
     apiSecret: string,
     useTestnet: boolean,
-    symbol?: string,
   ) {
-    const queryParams: Record<string, string> = {};
-    if (symbol) queryParams.symbol = symbol.toUpperCase();
     return this.makeSignedRequest(
       apiKey,
       apiSecret,
       useTestnet,
       "GET",
       BINANCE_ENDPOINTS.FUTURES_OPEN_ORDERS,
-      queryParams,
     );
   }
 
@@ -360,17 +356,13 @@ export class BinanceService {
     apiKey: string,
     apiSecret: string,
     useTestnet: boolean,
-    symbol?: string,
   ) {
-    const queryParams: Record<string, string> = {};
-    if (symbol) queryParams.symbol = symbol.toUpperCase();
     return this.makeSignedRequest(
       apiKey,
       apiSecret,
       useTestnet,
       "GET",
       BINANCE_ENDPOINTS.FUTURES_PENDING_TP_SL,
-      queryParams,
     );
   }
 
