@@ -234,7 +234,15 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
 
   fastify.post(
     ROUTES.SIGN_IN,
-    { schema: SigninSchema },
+    {
+      schema: SigninSchema,
+      config: {
+        rateLimit: {
+          max: 3,
+          timeWindow: "1 minute",
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const { apiKey, apiSecret, useTestnet } = request.body as {
@@ -271,7 +279,15 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
 
   fastify.post(
     ROUTES.SIGN_IN_EMAIL,
-    { schema: SigninEmailSchema },
+    {
+      schema: SigninEmailSchema,
+      config: {
+        rateLimit: {
+          max: 3,
+          timeWindow: "1 minute",
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const { email, password, useTestnet } = request.body as {
