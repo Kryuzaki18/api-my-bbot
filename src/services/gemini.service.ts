@@ -6,6 +6,7 @@ import {
 } from "../constants/ai.constant.js";
 import { RESPONSE_MESSAGES } from "../constants/auth.constant.js";
 import { BinanceService } from "./binance.service.js";
+import Analysis, { type IAnalysis } from "../schema/analyses.schema.js";
 
 export class GeminiService {
   binanceService = new BinanceService();
@@ -27,7 +28,8 @@ export class GeminiService {
 
     try {
       const result = await basicModel.generateContent([{ text: prompt }]);
-      aiText = result.response.text();
+      const res = result.response.text();
+      aiText = typeof res === "string" ? JSON.parse(res) : res;
 
       if (!aiText) {
         throw new Error(RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
@@ -40,7 +42,8 @@ export class GeminiService {
         await this.delay(30000);
 
         const result = await basicModel.generateContent([{ text: prompt }]);
-        aiText = result.response.text();
+        const res = result.response.text();
+        aiText = typeof res === "string" ? JSON.parse(res) : res;
 
         if (!aiText) {
           throw new Error(RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
@@ -66,7 +69,8 @@ export class GeminiService {
     const prompt = AI_ANALYZE_MARKET_TEMPLATE.concat("\n" + dataPrompt);
 
     const aiModel = this.genAI.getGenerativeModel({
-      model: deepAnalyze ? AI_MODELS.GEMINI_PRO : AI_MODELS.GEMINI_BASIC,
+      model: AI_MODELS.GEMINI_BASIC,
+      // model: deepAnalyze ? AI_MODELS.GEMINI_PRO : AI_MODELS.GEMINI_BASIC,
       generationConfig: {
         responseMimeType: "application/json",
       },
@@ -76,11 +80,15 @@ export class GeminiService {
 
     try {
       const result = await aiModel.generateContent([{ text: prompt }]);
-      aiText = result.response.text();
+      const res = result.response.text();
+
+      aiText = typeof res === "string" ? JSON.parse(res) : res;
 
       if (!aiText) {
         throw new Error(RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
       }
+
+      await Analysis.create(aiText as unknown as IAnalysis);
 
       return aiText;
     } catch (err: any) {
@@ -89,7 +97,8 @@ export class GeminiService {
         await this.delay(30000);
 
         const result = await aiModel.generateContent([{ text: prompt }]);
-        aiText = result.response.text();
+        const res = result.response.text();
+        aiText = typeof res === "string" ? JSON.parse(res) : res;
 
         if (!aiText) {
           throw new Error(RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);

@@ -21,11 +21,11 @@ const seedUsers = async () => {
   });
 };
 
-export const runSeed = async () => {
+export const usersSeed = async () => {
   try {
     await seedUsers();
-    console.log("Seeding completed");
+    console.log("User data seeded successfully");
   } catch (err) {
-    console.error("Seeding failed:", err);
+    console.error("User data seeding failed:", err);
   }
 };

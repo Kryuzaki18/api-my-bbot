@@ -74,7 +74,7 @@ const rules = [
 
   `The AI MUST NOT fetch or assume external data.`,
 
-  `signal must be based on leverage + timeframe + risk rules`,
+  `signal MUST be based on leverage + timeframe + risk rules`,
 
   `buy and sell MUST NOT include confidence. They inherit confidence from signal.`,
 
@@ -87,8 +87,6 @@ const rules = [
   - timeframe = scalp (3m–15m)
   - confidence score ≥ 80
   - RR ≥ 2.0`,
-
-  `ALWAYS provide analysis for today 1d timeframe max 100 words ONLY for message property`,
 
   `Return ONLY a JSON object with these exact format
   { 
@@ -137,7 +135,7 @@ const rules = [
       ]
     }
   }`,
-
+  `For the message property ALWAYS provide analysis for today's 1d timeframe max 200 words ONLY.`,
   `ANALYZE the signal, buy and sell based on the confluence of indicators and patterns coming from the data fetched.`,
   "NEVER break JSON structure.",
   "NEVER hallucinate data.",
