@@ -9,6 +9,7 @@ const schema = Type.Object({
   COOKIE_SECRET: Type.String({ minLength: 16 }),
   MONGODB_URI: Type.String({ minLength: 10 }),
   CLIENT_ORIGIN: Type.String({ default: "http://localhost:4200" }),
+  GEMINI_API_KEY: Type.String({ minLength: 1 }),
 });
 
 type EnvConfig = Static<typeof schema>;

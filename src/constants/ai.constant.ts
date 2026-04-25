@@ -57,6 +57,58 @@ const chatRules = [
   }`,
 ];
 
+const tradeBotRules = [
+  `If marketData is missing or empty return this format
+  { 
+    status: "rejected", 
+    message: "Market data is missing or empty, cannot generate setup.", 
+    response: null
+  }`,
+
+  `The AI MUST NOT fetch or assume external data.`,
+
+  `signal MUST be based on leverage + timeframe + risk rules`,
+
+  `buy and sell MUST NOT include confidence. They inherit confidence from signal.`,
+
+  `Extreme leverage (35x–50x) is ONLY allowed if:
+  - timeframe = scalp (3m–15m)
+  - confidence score ≥ 80
+  - RR ≥ 2.0`,
+
+  `Return ONLY a JSON object with these exact format
+  { 
+    status: "accepted", 
+    message: string, 
+    response: {
+      signal: {
+        type: "buy | sell",
+        entryZone: [number, number],
+        sl: number,
+        tp: number,
+        leverage: number,
+        riskReward: number,
+        reasoning: string,
+        confidence: {
+          score: number,
+          components: {
+            trend: number,
+            momentum: number,
+            volume: number,
+            structure: number
+          }
+        }
+      },
+    }
+  }`,
+  `ANALYZE the signal based on the confluence of indicators and patterns coming from the data fetched.`,
+  "NEVER break JSON structure.",
+  "NEVER hallucinate data.",
+  "NEVER skip validation rules.",
+  "NEVER provide analysis without confluence.",
+  "NEVER fabricate: Prices, Indicators, Signals, Market structure.",
+];
+
 const rules = [
   `If marketData is missing or empty return this format
   { 
@@ -148,13 +200,19 @@ export const AI_ANALYZE_MARKET_TEMPLATE = `
 ${scopes.join("\n")}
 ${standards.join("\n")}
 ${setup.join("\n")}
-${chatRules.join("\n")}
 ${rules.join("\n")}
 `;
 
 export const AI_CHAT_PROMPTS_TEMPLATE = `
 ${scopes.join("\n")}
 ${chatRules.join("\n")}
+`;
+
+export const AI_TRADE_BOT_TEMPLATE = `
+${scopes.join("\n")}
+${standards.join("\n")}
+${setup.join("\n")}
+${tradeBotRules.join("\n")}
 `;
 
 export const AI_MODELS = {

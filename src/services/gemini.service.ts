@@ -3,16 +3,25 @@ import {
   AI_MODELS,
   AI_ANALYZE_MARKET_TEMPLATE,
   AI_CHAT_PROMPTS_TEMPLATE,
+  AI_TRADE_BOT_TEMPLATE,
 } from "../constants/ai.constant.js";
 import { RESPONSE_MESSAGES } from "../constants/auth.constant.js";
 import { BinanceService } from "./binance.service.js";
-import Analysis, { type IAnalysis } from "../schema/analyses.schema.js";
+import Analyses, { type IAnalyses } from "../schema/analyses.schema.js";
+import { AIType, type AIResponse } from "../models/ai.model.js";
 
 export class GeminiService {
   binanceService = new BinanceService();
-  genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
+  genAI: GoogleGenerativeAI;
 
   delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+  constructor(private readonly geminiApiKey: string) {
+    if (!geminiApiKey || !geminiApiKey.trim()) {
+      throw Object.assign(new Error("GEMINI_API_KEY is missing."), { status: 500 });
+    }
+    this.genAI = new GoogleGenerativeAI(geminiApiKey);
+  }
 
   async chat(message: string) {
     const prompt = AI_CHAT_PROMPTS_TEMPLATE.concat("\n" + message);
@@ -55,18 +64,24 @@ export class GeminiService {
     }
   }
 
-  async analyze(symbol: string, interval: string, deepAnalyze: number) {
+  async analyze(symbol: string, interval: string, type: AIType = AIType.GENERAL) {
     const klines = await this.binanceService.getKlines(symbol, interval);
 
     if (!klines) {
-      throw new Error(RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+      return {
+        status: "rejected",
+        message: "Market data is missing or empty, cannot generate analysis.",
+        response: null,
+      } as AIResponse;
     }
+
+    const template = type === AIType.GENERAL ? AI_ANALYZE_MARKET_TEMPLATE : AI_TRADE_BOT_TEMPLATE;
 
     const dataPrompt =
       `Here is the marketData for ${symbol} with timeframe ${interval}:` +
       `\n` +
       JSON.stringify(klines);
-    const prompt = AI_ANALYZE_MARKET_TEMPLATE.concat("\n" + dataPrompt);
+    const prompt = template.concat("\n" + dataPrompt);
 
     const aiModel = this.genAI.getGenerativeModel({
       model: AI_MODELS.GEMINI_BASIC,
@@ -85,10 +100,14 @@ export class GeminiService {
       aiText = typeof res === "string" ? JSON.parse(res) : res;
 
       if (!aiText) {
-        throw new Error(RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+        return {
+          status: "rejected",
+          message: "AI response is missing or empty, cannot generate analysis.",
+          response: null,
+        } as AIResponse;
       }
 
-      await Analysis.create(aiText as unknown as IAnalysis);
+      await Analyses.create(aiText as unknown as IAnalyses);
 
       return aiText;
     } catch (err: any) {
@@ -101,7 +120,11 @@ export class GeminiService {
         aiText = typeof res === "string" ? JSON.parse(res) : res;
 
         if (!aiText) {
-          throw new Error(RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+          return {
+            status: "rejected",
+            message: "AI response is missing or empty, cannot generate analysis.",
+            response: null,
+          } as AIResponse;
         }
 
         return aiText;

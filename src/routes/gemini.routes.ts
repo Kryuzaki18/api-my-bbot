@@ -45,7 +45,7 @@ const AIAnalyzeSchema = {
 };
 
 const geminiRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
-  const geminiService = new GeminiService();
+  const geminiService = new GeminiService(fastify.config.GEMINI_API_KEY);
 
   fastify.post(
     ROUTES.AI_CHAT,
