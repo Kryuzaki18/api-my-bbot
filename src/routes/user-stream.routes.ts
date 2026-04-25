@@ -1,18 +1,18 @@
 import { type FastifyInstance, type FastifyPluginAsync } from "fastify";
 import { Type } from "@sinclair/typebox";
 
-import { BinanceService } from "../services/binance.service.js";
 import { ROUTES } from "../config/app-routes.js";
-import User from "../schema/users.schema.js";
+import { binanceService } from "../services/binance.singleton.js";
+import { authHook } from "../hooks/auth.hook.js";
+import { sendError } from "../utils/reply.util.js";
+import { BearerAuth } from "../schemas/shared.schema.js";
 
 const GetUserStreamSchema = {
   description: "Starts a new user data stream and returns a listenKey.",
   tags: ["User Stream"],
-  security: [{ bearerAuth: [] }],
+  security: BearerAuth,
   response: {
-    200: Type.Object({
-      listenKey: Type.String(),
-    }),
+    200: Type.Object({ listenKey: Type.String() }),
     400: Type.Any(),
     500: Type.Any(),
   },
@@ -22,117 +22,52 @@ const KeepAliveUserStreamSchema = {
   description:
     "Pings a listenKey to keep it alive. Should be called every 30 minutes.",
   tags: ["User Stream"],
-  security: [{ bearerAuth: [] }],
-  response: {
-    200: Type.Any(),
-    400: Type.Any(),
-    500: Type.Any(),
-  },
+  security: BearerAuth,
+  response: { 200: Type.Any(), 400: Type.Any(), 500: Type.Any() },
 };
 
 const CloseUserStreamSchema = {
   description: "Closes out a user data stream.",
   tags: ["User Stream"],
-  security: [{ bearerAuth: [] }],
-  response: {
-    200: Type.Any(),
-    400: Type.Any(),
-    500: Type.Any(),
-  },
+  security: BearerAuth,
+  response: { 200: Type.Any(), 400: Type.Any(), 500: Type.Any() },
 };
 
-const userStreamRoutes: FastifyPluginAsync = async (
-  fastify: FastifyInstance,
-) => {
-  const binanceService = new BinanceService();
+const userStreamRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
+  fastify.addHook("onRequest", authHook);
 
-  fastify.addHook("onRequest", async (request, reply) => {
+  fastify.post(ROUTES.USER_STREAM, { schema: GetUserStreamSchema }, async (request, reply) => {
     try {
-      await request.jwtVerify();
-      if (request.user?.email) {
-        const userDB = await User.findOne({ email: request.user.email }).lean();
-        if (!userDB) throw new Error("Invalid session user");
-        
-        let useTestnet = request.user.useTestnet;
-        if (request.body && typeof (request.body as any).useTestnet === "boolean") {
-          useTestnet = (request.body as any).useTestnet;
-          request.user.useTestnet = useTestnet;
-        } else if (request.query && typeof (request.query as any).useTestnet === "string") {
-          useTestnet = (request.query as any).useTestnet === "true";
-          request.user.useTestnet = useTestnet;
-        }
-
-        const keys = useTestnet ? userDB.binanceKeys.test : userDB.binanceKeys.prod;
-        request.user.apiKey = keys.apiKey;
-        request.user.apiSecret = keys.apiSecret;
-      }
-    } catch (err) {
-      reply.send(err);
+      const { apiKey, useTestnet } = request.user;
+      return reply.code(200).send(
+        await binanceService.getListenKey(apiKey!, useTestnet),
+      );
+    } catch (error) {
+      return sendError(reply, error);
     }
   });
 
-  fastify.post(
-    ROUTES.USER_STREAM,
-    { schema: GetUserStreamSchema },
-    async (request, reply) => {
-      try {
-        const { apiKey, useTestnet } = request.user as any;
-        const result = await binanceService.getListenKey(apiKey, useTestnet);
-        return reply.code(200).send(result);
-      } catch (error: any) {
-        if (error.status)
-          return reply
-            .code(error.status)
-            .send({ error: error.message, details: error.details });
-        return reply
-          .code(500)
-          .send({ error: "Internal Server Error", details: error.message });
-      }
-    },
-  );
+  fastify.put(ROUTES.USER_STREAM, { schema: KeepAliveUserStreamSchema }, async (request, reply) => {
+    try {
+      const { apiKey, useTestnet } = request.user;
+      return reply.code(200).send(
+        await binanceService.keepAliveListenKey(apiKey!, useTestnet),
+      );
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
 
-  fastify.put(
-    ROUTES.USER_STREAM,
-    { schema: KeepAliveUserStreamSchema },
-    async (request, reply) => {
-      try {
-        const { apiKey, useTestnet } = request.user as any;
-        const result = await binanceService.keepAliveListenKey(
-          apiKey,
-          useTestnet,
-        );
-        return reply.code(200).send(result);
-      } catch (error: any) {
-        if (error.status)
-          return reply
-            .code(error.status)
-            .send({ error: error.message, details: error.details });
-        return reply
-          .code(500)
-          .send({ error: "Internal Server Error", details: error.message });
-      }
-    },
-  );
-
-  fastify.delete(
-    ROUTES.USER_STREAM,
-    { schema: CloseUserStreamSchema },
-    async (request, reply) => {
-      try {
-        const { apiKey, useTestnet } = request.user as any;
-        const result = await binanceService.closeListenKey(apiKey, useTestnet);
-        return reply.code(200).send(result);
-      } catch (error: any) {
-        if (error.status)
-          return reply
-            .code(error.status)
-            .send({ error: error.message, details: error.details });
-        return reply
-          .code(500)
-          .send({ error: "Internal Server Error", details: error.message });
-      }
-    },
-  );
+  fastify.delete(ROUTES.USER_STREAM, { schema: CloseUserStreamSchema }, async (request, reply) => {
+    try {
+      const { apiKey, useTestnet } = request.user;
+      return reply.code(200).send(
+        await binanceService.closeListenKey(apiKey!, useTestnet),
+      );
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
 };
 
 export default userStreamRoutes;
