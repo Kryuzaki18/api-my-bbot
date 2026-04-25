@@ -5,6 +5,7 @@ export const ROUTES = {
   SIGN_UP: '/api/auth/signup',
   SIGN_IN: '/api/auth/signin',
   SIGN_IN_EMAIL: '/api/auth/signin-email',
+  SWITCH_MODE: '/api/auth/switch-mode',
   SIGN_OUT: '/api/auth/signout',
   ME: '/api/auth/me',
   USER_INFO: '/api/user-info',

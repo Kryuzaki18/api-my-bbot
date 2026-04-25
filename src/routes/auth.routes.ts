@@ -106,6 +106,23 @@ const SignoutSchema = {
   },
 };
 
+const SwitchModeSchema = {
+  description:
+    "Switches current authenticated session mode between demo/live and refreshes session cookie.",
+  tags: ["Authentication"],
+  security: [{ cookieAuth: [] }],
+  body: Type.Object({
+    useTestnet: Type.Boolean(),
+  }),
+  response: {
+    200: Type.Object({
+      message: Type.String(),
+      useTestnet: Type.Boolean(),
+    }),
+    401: Type.Object({ error: Type.String() }),
+  },
+};
+
 const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   fastify.post(ROUTES.SIGN_UP, { schema: SignupSchema }, async (request, reply) => {
     const { email, password, binanceKeys } = request.body as {
@@ -284,6 +301,33 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   fastify.post(ROUTES.SIGN_OUT, { schema: SignoutSchema }, async (_request, reply) => {
     reply.clearCookie(COOKIE_NAME, { path: "/" });
     return reply.code(200).send({ message: "Signed out successfully" });
+  });
+
+  fastify.post(ROUTES.SWITCH_MODE, { schema: SwitchModeSchema }, async (request, reply) => {
+    try {
+      await request.jwtVerify();
+      const { useTestnet } = request.body as { useTestnet: boolean };
+
+      const { email, apiKey, apiSecret } = request.user;
+      let payload: { email?: string; apiKey?: string; apiSecret?: string; useTestnet: boolean };
+      if (email) {
+        payload = { email, useTestnet };
+      } else if (apiKey && apiSecret) {
+        payload = { apiKey, apiSecret, useTestnet };
+      } else {
+        return reply.code(401).send({ error: "Session expired or invalid" });
+      }
+
+      const token = fastify.jwt.sign(payload, { expiresIn: "7d" });
+      reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
+
+      return reply.code(200).send({
+        message: `Switched to ${useTestnet ? "demo" : "live"} mode successfully`,
+        useTestnet,
+      });
+    } catch {
+      return reply.code(401).send({ error: "Session expired or invalid" });
+    }
   });
 };
 
