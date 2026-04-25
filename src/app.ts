@@ -3,6 +3,7 @@ import fastifyCors from "@fastify/cors";
 import fastifyJwt from "@fastify/jwt";
 import fastifyCookie from "@fastify/cookie";
 import fastifyRateLimit from "@fastify/rate-limit";
+import fastifyHelmet from "@fastify/helmet";
 import { type TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 
 import fastifySwagger from "@fastify/swagger";
@@ -32,6 +33,10 @@ export function buildApp(): FastifyInstance {
   app.register(configEnv);
 
   app.after(async () => {
+    await app.register(fastifyHelmet, {
+      contentSecurityPolicy: false,
+    });
+
     await app.register(fastifyRateLimit, {
       global: false,
     });
