@@ -29,7 +29,6 @@ const AIAnalyzeSchema = {
   body: Type.Object({
     symbol: Type.String({ minLength: 3 }),
     interval: Type.String({ minLength: 2 }),
-    deepAnalyze: Type.Optional(Type.Number()),
   }),
   response: {
     200: Type.Any(),
@@ -74,13 +73,13 @@ const geminiRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     { schema: AIAnalyzeSchema },
     async (request, reply) => {
       try {
-        const { symbol, interval, deepAnalyze } = request.body as any;
+        const { symbol, interval } = request.body as any;
 
         if (symbol === undefined || interval === undefined) {
           return reply.code(400).send({ error: "Invalid request." });
         }
 
-        const result = await geminiService.analyze(symbol, interval, deepAnalyze);
+        const result = await geminiService.analyze(symbol, interval);
         return reply.code(200).send(result);
       } catch (error: any) {
         request.log.error(error);

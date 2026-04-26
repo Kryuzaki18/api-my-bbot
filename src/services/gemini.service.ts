@@ -16,7 +16,7 @@ export class GeminiService {
 
   delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-  constructor(private readonly geminiApiKey: string) {
+  constructor(readonly geminiApiKey: string) {
     if (!geminiApiKey || !geminiApiKey.trim()) {
       throw Object.assign(new Error("GEMINI_API_KEY is missing."), { status: 500 });
     }
@@ -85,7 +85,6 @@ export class GeminiService {
 
     const aiModel = this.genAI.getGenerativeModel({
       model: AI_MODELS.GEMINI_BASIC,
-      // model: deepAnalyze ? AI_MODELS.GEMINI_PRO : AI_MODELS.GEMINI_BASIC,
       generationConfig: {
         responseMimeType: "application/json",
       },

@@ -1,6 +1,6 @@
 export const ROUTES = {
-  AI_CHAT: '/api/ai/chat',
-  AI_ANALYZE_MARKET: '/api/ai/analyze-market',
+  AI_CHAT: '/api/chat',
+  AI_ANALYZE_MARKET: '/api/analyze-market',
   TRADE_BOT: '/api/trade-bot',
   SIGN_UP: '/api/auth/signup',
   SIGN_IN: '/api/auth/signin',
