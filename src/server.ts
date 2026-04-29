@@ -4,7 +4,7 @@ const start = async () => {
   const app = buildApp();
   try {
     await app.ready();
-    const port = app.config.PORT || 3000;
+    const port = app.config.PORT;
     await app.listen({ port, host: '0.0.0.0' });
   } catch (err) {
     app.log.error(err);
