@@ -1,7 +1,7 @@
 import { buildApp } from './app.js';
 
 const start = async () => {
-  const app = buildApp();
+  const app = await buildApp();
   try {
     await app.ready();
     const port = app.config.PORT;

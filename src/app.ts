@@ -25,78 +25,64 @@ declare module "@fastify/jwt" {
   }
 }
 
-export function buildApp(): FastifyInstance {
-  const app = fastify({
-    logger: true,
-  }).withTypeProvider<TypeBoxTypeProvider>();
+export async function buildApp(): Promise<FastifyInstance> {
+  const app = fastify({ logger: true }).withTypeProvider<TypeBoxTypeProvider>();
 
-  app.register(configEnv);
+  await app.register(configEnv);
 
-  app.after(async () => {
-    await app.register(fastifyHelmet, {
-      contentSecurityPolicy: false,
-    });
+  await app.register(fastifyHelmet, { contentSecurityPolicy: false });
+  await app.register(fastifyRateLimit, { global: false });
 
-    await app.register(fastifyRateLimit, {
-      global: false,
-    });
+  await app.register(fastifyCors, {
+    origin: app.config.CLIENT_ORIGIN,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  });
 
-    app.register(fastifyCors, {
-      origin: app.config.CLIENT_ORIGIN,
-      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization"],
-      credentials: true, // Required for cookies to be sent cross-origin
-    });
+  await app.register(fastifyCookie, {
+    secret: app.config.COOKIE_SECRET,
+    hook: "onRequest",
+    parseOptions: {},
+  });
 
-    app.register(fastifyCookie, {
-      secret: app.config.COOKIE_SECRET,
-      hook: "onRequest",
-      parseOptions: {},
-    });
+  await app.register(fastifyJwt, {
+    secret: app.config.JWT_SECRET,
+    cookie: {
+      cookieName: COOKIE_NAME,
+      signed: false,
+    },
+  });
 
-    app.register(fastifyJwt, {
-      secret: app.config.JWT_SECRET,
-      cookie: {
-        cookieName: COOKIE_NAME,
-        signed: false,
+  await app.register(fastifySwagger, {
+    openapi: {
+      info: {
+        title: "Binance Trading Proxy",
+        description:
+          "A stateless proxy for executing API trades on Binance securely",
+        version: "1.0.0",
       },
-    });
-
-    // Swagger docs
-    await app.register(fastifySwagger, {
-      openapi: {
-        info: {
-          title: "Binance Trading Proxy",
-          description:
-            "A stateless proxy for executing API trades on Binance securely",
-          version: "1.0.0",
-        },
-        components: {
-          securitySchemes: {
-            bearerAuth: {
-              type: "http",
-              scheme: "bearer",
-              bearerFormat: "JWT",
-            },
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: "http",
+            scheme: "bearer",
+            bearerFormat: "JWT",
           },
         },
       },
-    });
-
-    await app.register(fastifySwaggerUi, {
-      routePrefix: "/docs",
-    });
-
-    app.get("/swagger.json", async (request, reply) => {
-      return app.swagger();
-    });
-
-    connectDB(app.config.MONGODB_URI).catch((err) => {
-      app.log.error({ err }, "[MongoDB] Failed to connect");
-    });
-
-    app.register(appRoutes);
+    },
   });
+
+  await app.register(fastifySwaggerUi, { routePrefix: "/docs" });
+
+  app.get("/swagger.json", async () => app.swagger());
+
+  connectDB(app.config.MONGODB_URI).catch((err) => {
+    app.log.error({ err }, "[MongoDB] Failed to connect");
+  });
+
+  await app.register(appRoutes);
 
   return app;
 }
