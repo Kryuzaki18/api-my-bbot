@@ -53,7 +53,6 @@ export interface TPSLParams {
 
 export interface CancelTpSlParams {
   algoId: number;
-  clientAlgoId: string;
   useTestnet: boolean;
 }
 

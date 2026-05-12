@@ -87,7 +87,6 @@ const CancelTpSlSchema = {
   security: BearerAuth,
   body: Type.Object({
     algoId: Type.Number({ minimum: 1 }),
-    clientAlgoId: Type.String({ minLength: 1 }),
   }),
   response: { 200: Type.Any(), ...StandardErrors },
 };

@@ -23,6 +23,8 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@binance/algo": "^3.1.16",
+    "@binance/derivatives-trading-usds-futures": "^29.0.0",
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.2.0",
     "@fastify/env": "^5.0.3",

@@ -1,10 +1,9 @@
-import { createHmac } from "crypto";
-import { request } from "undici";
 import {
-  BINANCE_FUTURES_PROD_URL,
-  BINANCE_FUTURES_TESTNET_URL,
-  BINANCE_ENDPOINTS,
-} from "../config/api-binance.js";
+  DerivativesTradingUsdsFutures,
+  DERIVATIVES_TRADING_USDS_FUTURES_REST_API_TESTNET_URL,
+  type DerivativesTradingUsdsFuturesRestAPI,
+} from "@binance/derivatives-trading-usds-futures";
+import { Algo, type AlgoRestAPI } from "@binance/algo";
 import {
   type OrderParams,
   type TPSLParams,
@@ -15,163 +14,78 @@ import {
   type CancelTpSlParams,
 } from "../models/order.model.js";
 
+// ---------------------------------------------------------------------------
+// Client factories
+//
+// Both packages recommend creating a client per-request (or per-user) rather
+// than sharing a singleton, because credentials are baked into the config at
+// construction time. These lightweight factories keep user credentials
+// isolated and avoid any shared mutable state.
+// ---------------------------------------------------------------------------
+
+function createFuturesClient(
+  apiKey: string,
+  apiSecret: string,
+  useTestnet: boolean,
+) {
+  return new DerivativesTradingUsdsFutures({
+    configurationRestAPI: {
+      apiKey,
+      apiSecret,
+      ...(useTestnet && {
+        basePath: DERIVATIVES_TRADING_USDS_FUTURES_REST_API_TESTNET_URL,
+      }),
+    },
+  });
+}
+
+function createAlgoClient(apiKey: string, apiSecret: string) {
+  return new Algo({
+    configurationRestAPI: { apiKey, apiSecret },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Exchange info cache — avoids hammering the exchange info endpoint on every
+// order. Keyed by "mainnet" | "testnet".
+// ---------------------------------------------------------------------------
+const exchangeInfoCache: Record<string, DerivativesTradingUsdsFuturesRestAPI.ExchangeInformationResponse> = {};
+
 export class BinanceService {
-  private exchangeInfoCache: Record<string, any> = {};
-  private timeOffset: number = 0;
+  // -------------------------------------------------------------------------
+  // Internal helpers
+  // -------------------------------------------------------------------------
 
-  private getBaseUrl(useTestnet: boolean) {
-    return useTestnet ? BINANCE_FUTURES_TESTNET_URL : BINANCE_FUTURES_PROD_URL;
-  }
-
-  private async syncTime(useTestnet: boolean) {
-    const baseUrl = this.getBaseUrl(useTestnet);
-    const start = Date.now();
-
-    const res = await request(`${baseUrl}${BINANCE_ENDPOINTS.FUTURES_TIME}`);
-    const data = (await res.body.json()) as { serverTime: number };
-
-    const end = Date.now();
-    const avgLocalTime = (start + end) / 2;
-
-    this.timeOffset = data.serverTime - avgLocalTime - 1000;
-  }
-
-  private async makeSignedRequest(
+  private async getExchangeInfo(
     apiKey: string,
     apiSecret: string,
     useTestnet: boolean,
-    method: "GET" | "POST" | "DELETE",
-    endpoint: string,
-    queryParams: Record<string, string | number | boolean> = {},
-  ) {
-    const baseUrl = this.getBaseUrl(useTestnet);
-
-    if (this.timeOffset === 0) {
-      await this.syncTime(useTestnet);
-    }
-
-    queryParams.timestamp = Math.floor(Date.now() + this.timeOffset);
-
-    const queryString = new URLSearchParams(queryParams as any).toString();
-    const signature = createHmac("sha256", apiSecret)
-      .update(queryString)
-      .digest("hex");
-
-    const finalUrl = `${baseUrl}${endpoint}?${queryString}&signature=${signature}`;
-
-    const { statusCode, body, headers } = await request(finalUrl, {
-      method,
-      headers: { "X-MBX-APIKEY": apiKey },
-    });
-
-    const contentType = headers["content-type"] || "";
-    let responseData;
-
-    if (contentType.includes("application/json")) {
-      responseData = await body.json();
-    } else {
-      const text = await body.text();
-      throw new Error(`Binance API Error: ${text.substring(0, 100)}`);
-    }
-
-    if (statusCode !== 200) {
-      throw Object.assign(new Error("Binance API Error"), {
-        status: statusCode,
-        details: responseData,
-      });
-    }
-
-    return responseData;
-  }
-
-  private async makeApiRequest(
-    apiKey: string,
-    useTestnet: boolean,
-    method: "GET" | "POST" | "PUT" | "DELETE",
-    endpoint: string,
-  ) {
-    const baseUrl = this.getBaseUrl(useTestnet);
-
-    const { statusCode, body } = await request(`${baseUrl}${endpoint}`, {
-      method,
-      headers: {
-        "X-MBX-APIKEY": apiKey,
-        "Content-Type": "application/json",
-      },
-    });
-
-    const responseData = await body.json();
-
-    if (statusCode !== 200) {
-      throw Object.assign(new Error("Binance API Error"), {
-        status: statusCode,
-        details: responseData,
-      });
-    }
-
-    return responseData;
-  }
-
-  async getKlines(symbol: string, interval: string) {
-    const params = {
-      symbol,
-      interval,
-      limit: "150",
-    };
-
-    const queryString = new URLSearchParams(params);
-
-    const finalUrl = `${BINANCE_FUTURES_PROD_URL}${BINANCE_ENDPOINTS.FUTURES_KLINE}?${queryString}`;
-
-    const { statusCode, body } = await request(finalUrl, {
-      method: "GET",
-    });
-
-    if (statusCode !== 200) {
-      throw Object.assign(new Error("API Binance Error"), {
-        status: statusCode,
-        details: "Error Fetching klines",
-      });
-    }
-
-    const responseData = await body.json() as any[];
-    
-    if (responseData?.length > 0) {
-      return responseData?.map((raw: any) => ({
-        open: raw[1],
-        high: raw[2],
-        low: raw[3],
-        close: raw[4],
-      }));
-    }
-
-    return [];
-  }
-
-  private async getExchangeInfo(useTestnet: boolean) {
+  ): Promise<DerivativesTradingUsdsFuturesRestAPI.ExchangeInformationResponse> {
     const cacheKey = useTestnet ? "testnet" : "mainnet";
-    if (!this.exchangeInfoCache[cacheKey]) {
-      this.exchangeInfoCache[cacheKey] = await this.makeApiRequest(
-        "",
-        useTestnet,
-        "GET",
-        BINANCE_ENDPOINTS.FUTURES_EXCHANGE_INFO,
-      );
+    if (!exchangeInfoCache[cacheKey]) {
+      const client = createFuturesClient(apiKey, apiSecret, useTestnet);
+      const res = await client.restAPI!.exchangeInformation();
+      exchangeInfoCache[cacheKey] = await res.data();
     }
-    return this.exchangeInfoCache[cacheKey];
+    return exchangeInfoCache[cacheKey];
   }
 
-  private async applyExchangeFilters(params: any, useTestnet: boolean) {
+  private async applyExchangeFilters(
+    params: any,
+    apiKey: string,
+    apiSecret: string,
+    useTestnet: boolean,
+  ) {
     try {
-      const info = await this.getExchangeInfo(useTestnet);
-      const symbolInfo = info.symbols.find(
-        (s: any) => s.symbol.toUpperCase() === params.symbol.toUpperCase(),
+      const info = await this.getExchangeInfo(apiKey, apiSecret, useTestnet);
+      const symbolInfo = info.symbols?.find(
+        (s) => s.symbol?.toUpperCase() === params.symbol.toUpperCase(),
       );
       if (!symbolInfo) return;
 
-      const lotSizeFilter = symbolInfo.filters.find(
+      const lotSizeFilter = symbolInfo.filters?.find(
         (f: any) => f.filterType === "LOT_SIZE",
-      );
+      ) as any;
       if (lotSizeFilter && params.quantity !== undefined) {
         params.quantity = this.roundToTickSize(
           params.quantity,
@@ -187,15 +101,12 @@ export class BinanceService {
         }
       }
 
-      const priceFilter = symbolInfo.filters.find(
+      const priceFilter = symbolInfo.filters?.find(
         (f: any) => f.filterType === "PRICE_FILTER",
-      );
+      ) as any;
       if (priceFilter) {
         if (params.price !== undefined) {
-          params.price = this.roundToTickSize(
-            params.price,
-            priceFilter.tickSize,
-          );
+          params.price = this.roundToTickSize(params.price, priceFilter.tickSize);
         }
         if (params.stopPrice !== undefined) {
           params.stopPrice = this.roundToTickSize(
@@ -213,7 +124,6 @@ export class BinanceService {
   private roundToTickSize(price: number, tickSize: string): number {
     const tickSizeNum = parseFloat(tickSize);
     if (tickSizeNum <= 0) return price;
-
     const precision = Math.log10(1 / tickSizeNum);
     return Number(price.toFixed(precision));
   }
@@ -224,18 +134,52 @@ export class BinanceService {
     useTestnet: boolean,
     symbol: string,
     leverage: number,
-  ) {
-    return this.makeSignedRequest(
-      apiKey,
-      apiSecret,
-      useTestnet,
-      "POST",
-      BINANCE_ENDPOINTS.FUTURES_LEVERAGE,
-      {
-        symbol,
-        leverage,
-      },
-    );
+  ): Promise<void> {
+    const client = createFuturesClient(apiKey, apiSecret, useTestnet);
+    const res = await client.restAPI!.changeInitialLeverage({ symbol, leverage });
+    await res.data();
+  }
+
+  // -------------------------------------------------------------------------
+  // Market data
+  // -------------------------------------------------------------------------
+
+  async getKlines(symbol: string, interval: string): Promise<any[]> {
+    // Klines are public — no credentials needed, always use mainnet.
+    const client = createFuturesClient("", "", false);
+    const res = await client.restAPI!.klineCandlestickData({
+      symbol,
+      // The interval string values ("1m", "15m", etc.) match the enum values
+      // exactly, so a cast is safe here.
+      interval: interval as DerivativesTradingUsdsFuturesRestAPI.KlineCandlestickDataIntervalEnum,
+      limit: 150,
+    });
+    const raw = (await res.data()) as any[];
+
+    if (raw?.length > 0) {
+      return raw.map((candle: any) => ({
+        open: candle[1],
+        high: candle[2],
+        low: candle[3],
+        close: candle[4],
+      }));
+    }
+
+    return [];
+  }
+
+  // -------------------------------------------------------------------------
+  // Account
+  // -------------------------------------------------------------------------
+
+  async getAccountInformation(
+    apiKey: string,
+    apiSecret: string,
+    useTestnet: boolean,
+  ): Promise<any> {
+    const client = createFuturesClient(apiKey, apiSecret, useTestnet);
+    const res = await client.restAPI!.accountInformationV2();
+    return res.data();
   }
 
   async getLeverageBracket(
@@ -243,17 +187,12 @@ export class BinanceService {
     apiSecret: string,
     useTestnet: boolean,
     symbol?: string,
-  ) {
-    return this.makeSignedRequest(
-      apiKey,
-      apiSecret,
-      useTestnet,
-      "GET",
-      BINANCE_ENDPOINTS.FUTURES_LEVERAGE_BRACKET,
-      {
-        symbol: symbol || "",
-      },
+  ): Promise<any> {
+    const client = createFuturesClient(apiKey, apiSecret, useTestnet);
+    const res = await client.restAPI!.notionalAndLeverageBrackets(
+      symbol ? { symbol } : {},
     );
+    return res.data();
   }
 
   async getCommissionRate(
@@ -261,112 +200,117 @@ export class BinanceService {
     apiSecret: string,
     useTestnet: boolean,
     symbols?: string[],
-  ) {
-    const commissionRates = [];
+  ): Promise<any[]> {
+    if (!symbols || symbols.length === 0) return [];
 
-    if (symbols && symbols.length > 0) {
-      for (const symbol of symbols) {
-        const commissionRate = await this.makeSignedRequest(
-          apiKey,
-          apiSecret,
-          useTestnet,
-          "GET",
-          BINANCE_ENDPOINTS.FUTURES_COMMISSION_RATE,
-          {
-            symbol: symbol || "",
-          },
-        );
-        commissionRates.push(commissionRate);
-      }
+    const client = createFuturesClient(apiKey, apiSecret, useTestnet);
+    const commissionRates: any[] = [];
+
+    for (const symbol of symbols) {
+      const res = await client.restAPI!.userCommissionRate({ symbol });
+      commissionRates.push(await res.data());
     }
 
     return commissionRates;
   }
 
-  async getAccountInformation(
-    apiKey: string,
-    apiSecret: string,
-    useTestnet: boolean,
-  ) {
-    return this.makeSignedRequest(
-      apiKey,
-      apiSecret,
-      useTestnet,
-      "GET",
-      BINANCE_ENDPOINTS.FUTURES_ACCOUNT,
-    );
+  // -------------------------------------------------------------------------
+  // Listen key (user data stream)
+  // -------------------------------------------------------------------------
+
+  async getListenKey(apiKey: string, useTestnet: boolean): Promise<any> {
+    const client = createFuturesClient(apiKey, "", useTestnet);
+    const res = await client.restAPI!.startUserDataStream();
+    return res.data();
   }
 
-  async getListenKey(apiKey: string, useTestnet: boolean) {
-    return this.makeApiRequest(
-      apiKey,
-      useTestnet,
-      "POST",
-      BINANCE_ENDPOINTS.FUTURES_LISTEN_KEY,
-    );
+  async keepAliveListenKey(apiKey: string, useTestnet: boolean): Promise<any> {
+    const client = createFuturesClient(apiKey, "", useTestnet);
+    const res = await client.restAPI!.keepaliveUserDataStream();
+    return res.data();
   }
 
-  async keepAliveListenKey(apiKey: string, useTestnet: boolean) {
-    return this.makeApiRequest(
-      apiKey,
-      useTestnet,
-      "PUT",
-      BINANCE_ENDPOINTS.FUTURES_LISTEN_KEY,
-    );
+  async closeListenKey(apiKey: string, useTestnet: boolean): Promise<any> {
+    const client = createFuturesClient(apiKey, "", useTestnet);
+    const res = await client.restAPI!.closeUserDataStream();
+    return res.data();
   }
 
-  async closeListenKey(apiKey: string, useTestnet: boolean) {
-    return this.makeApiRequest(
-      apiKey,
-      useTestnet,
-      "DELETE",
-      BINANCE_ENDPOINTS.FUTURES_LISTEN_KEY,
-    );
-  }
+  // -------------------------------------------------------------------------
+  // Positions & open orders
+  // -------------------------------------------------------------------------
 
   async getFuturesPositions(
     apiKey: string,
     apiSecret: string,
     useTestnet: boolean,
-  ) {
-    return this.makeSignedRequest(
-      apiKey,
-      apiSecret,
-      useTestnet,
-      "GET",
-      BINANCE_ENDPOINTS.FUTURES_POSITIONS,
-    );
+  ): Promise<any> {
+    const client = createFuturesClient(apiKey, apiSecret, useTestnet);
+    const res = await client.restAPI!.positionInformationV2();
+    return res.data();
   }
 
   async getOpenOrders(
     apiKey: string,
     apiSecret: string,
     useTestnet: boolean,
-  ) {
-    return this.makeSignedRequest(
-      apiKey,
-      apiSecret,
-      useTestnet,
-      "GET",
-      BINANCE_ENDPOINTS.FUTURES_OPEN_ORDERS,
-    );
+  ): Promise<any> {
+    const client = createFuturesClient(apiKey, apiSecret, useTestnet);
+    const res = await client.restAPI!.currentAllOpenOrders();
+    return res.data();
   }
 
+  // -------------------------------------------------------------------------
+  // Algo / conditional orders
+  //
+  // - getPendingTpSl / cancelTpSl use @binance/algo (sapi/v1/algo/futures/*)
+  // - placeTakeProfitOrder / placeStopLossOrder use newAlgoOrder from
+  //   @binance/derivatives-trading-usds-futures (fapi/v1/order/algo with
+  //   algoType=CONDITIONAL), which is the correct endpoint for TP/SL.
+  // -------------------------------------------------------------------------
+
+  /**
+   * Query open conditional (TP/SL) algo orders.
+   * Uses @binance/algo: GET /sapi/v1/algo/futures/openOrders
+   */
   async getPendingTpSl(
     apiKey: string,
     apiSecret: string,
-    useTestnet: boolean,
-  ) {
-    return this.makeSignedRequest(
-      apiKey,
-      apiSecret,
-      useTestnet,
-      "GET",
-      BINANCE_ENDPOINTS.FUTURES_PENDING_TP_SL,
-    );
+    _useTestnet: boolean,
+  ): Promise<AlgoRestAPI.QueryCurrentAlgoOpenOrdersFutureAlgoResponse> {
+    const client = createAlgoClient(apiKey, apiSecret);
+    const res = await client.restAPI!.queryCurrentAlgoOpenOrdersFutureAlgo();
+    return res.data();
   }
 
-  async placeOrder(apiKey: string, apiSecret: string, params: OrderParams) {
+  /**
+   * Cancel an active conditional (TP/SL) algo order.
+   * Uses @binance/algo: DELETE /sapi/v1/algo/futures/order
+   */
+  async cancelTpSl(
+    apiKey: string,
+    apiSecret: string,
+    params: CancelTpSlParams,
+  ): Promise<AlgoRestAPI.CancelAlgoOrderFutureAlgoResponse> {
+    if (!params.algoId) {
+      throw Object.assign(new Error("Algo ID is required."), { status: 400 });
+    }
+    const client = createAlgoClient(apiKey, apiSecret);
+    const res = await client.restAPI!.cancelAlgoOrderFutureAlgo({
+      algoId: params.algoId,
+    });
+    return res.data();
+  }
+
+  // -------------------------------------------------------------------------
+  // Order placement
+  // -------------------------------------------------------------------------
+
+  async placeOrder(
+    apiKey: string,
+    apiSecret: string,
+    params: OrderParams,
+  ): Promise<any> {
     await this.setLeverage(
       apiKey,
       apiSecret,
@@ -374,39 +318,33 @@ export class BinanceService {
       params.symbol,
       params.leverage,
     );
-    await this.applyExchangeFilters(params, params.useTestnet);
+    await this.applyExchangeFilters(params, apiKey, apiSecret, params.useTestnet);
 
-    const queryParams: Record<string, string | number> = {
+    const client = createFuturesClient(apiKey, apiSecret, params.useTestnet);
+
+    const orderParams: any = {
       symbol: params.symbol,
       side: params.side,
       type: params.type,
       quantity: params.quantity,
-      timeInForce: params.timeInForce || TimeInForce.GTC,
     };
 
     if (params.type === OrderType.LIMIT) {
       if (!params.price) throw new Error("Price is required for LIMIT orders");
-      queryParams.price = params.price;
-    } else if (params.type === OrderType.MARKET) {
-      queryParams.quantity = params.quantity;
-      delete queryParams.timeInForce;
+      orderParams.price = params.price;
+      orderParams.timeInForce = params.timeInForce || TimeInForce.GTC;
     }
+    // MARKET orders do not use timeInForce
 
-    return this.makeSignedRequest(
-      apiKey,
-      apiSecret,
-      params.useTestnet,
-      "POST",
-      BINANCE_ENDPOINTS.FUTURES_ORDER,
-      queryParams,
-    );
+    const res = await client.restAPI!.newOrder(orderParams);
+    return res.data();
   }
 
   async placeTakeProfitOrder(
     apiKey: string,
     apiSecret: string,
     params: TPSLParams,
-  ) {
+  ): Promise<any> {
     if (!params.quantity && !params.closePosition) {
       throw Object.assign(
         new Error(
@@ -416,9 +354,12 @@ export class BinanceService {
       );
     }
 
-    await this.applyExchangeFilters(params, params.useTestnet);
+    await this.applyExchangeFilters(params, apiKey, apiSecret, params.useTestnet);
 
-    const queryParams: Record<string, string | number | boolean> = {
+    const client = createFuturesClient(apiKey, apiSecret, params.useTestnet);
+
+    const orderParams: any = {
+      algoType: "CONDITIONAL",
       symbol: params.symbol,
       side: params.side === OrderSide.BUY ? OrderSide.SELL : OrderSide.BUY,
       type: OrderType.TAKE_PROFIT_MARKET,
@@ -426,29 +367,22 @@ export class BinanceService {
     };
 
     if (params.closePosition) {
-      queryParams.closePosition = true;
-      queryParams.algoType = "CONDITIONAL";
+      orderParams.closePosition = "true";
     } else if (params.quantity !== undefined) {
-      queryParams.quantity = params.quantity;
+      orderParams.quantity = params.quantity;
     }
 
-    if (params.workingType) queryParams.workingType = params.workingType;
+    if (params.workingType) orderParams.workingType = params.workingType;
 
-    return this.makeSignedRequest(
-      apiKey,
-      apiSecret,
-      params.useTestnet,
-      "POST",
-      BINANCE_ENDPOINTS.FUTURES_ALGO_ORDER,
-      queryParams,
-    );
+    const res = await client.restAPI!.newAlgoOrder(orderParams);
+    return res.data();
   }
 
   async placeStopLossOrder(
     apiKey: string,
     apiSecret: string,
     params: TPSLParams,
-  ) {
+  ): Promise<any> {
     if (!params.quantity && !params.closePosition) {
       throw Object.assign(
         new Error(
@@ -458,9 +392,12 @@ export class BinanceService {
       );
     }
 
-    await this.applyExchangeFilters(params, params.useTestnet);
+    await this.applyExchangeFilters(params, apiKey, apiSecret, params.useTestnet);
 
-    const queryParams: Record<string, string | number | boolean> = {
+    const client = createFuturesClient(apiKey, apiSecret, params.useTestnet);
+
+    const orderParams: any = {
+      algoType: "CONDITIONAL",
       symbol: params.symbol,
       side: params.side,
       type: OrderType.STOP_MARKET,
@@ -468,37 +405,33 @@ export class BinanceService {
     };
 
     if (params.closePosition) {
-      queryParams.closePosition = true;
-      queryParams.algoType = "CONDITIONAL";
+      orderParams.closePosition = "true";
     } else if (params.quantity !== undefined) {
-      queryParams.quantity = params.quantity;
+      orderParams.quantity = params.quantity;
     }
 
-    if (params.workingType) queryParams.workingType = params.workingType;
+    if (params.workingType) orderParams.workingType = params.workingType;
 
-    return this.makeSignedRequest(
-      apiKey,
-      apiSecret,
-      params.useTestnet,
-      "POST",
-      BINANCE_ENDPOINTS.FUTURES_ALGO_ORDER,
-      queryParams,
-    );
+    const res = await client.restAPI!.newAlgoOrder(orderParams);
+    return res.data();
   }
 
-  async closePosition(apiKey: string, apiSecret: string, params: TPSLParams) {
-    const positions = await this.makeSignedRequest(
-      apiKey,
-      apiSecret,
-      params.useTestnet,
-      "GET",
-      BINANCE_ENDPOINTS.FUTURES_POSITIONS,
-      { symbol: params.symbol },
-    );
+  async closePosition(
+    apiKey: string,
+    apiSecret: string,
+    params: TPSLParams,
+  ): Promise<any> {
+    const client = createFuturesClient(apiKey, apiSecret, params.useTestnet);
+
+    // Fetch the open position to determine the exact quantity to close
+    const positionsRes = await client.restAPI!.positionInformationV2({
+      symbol: params.symbol,
+    });
+    const positions = (await positionsRes.data()) as any[];
 
     const position = Array.isArray(positions)
       ? positions.find(
-          (p: any) => p.symbol.toUpperCase() === params.symbol.toUpperCase(),
+          (p: any) => p.symbol?.toUpperCase() === params.symbol.toUpperCase(),
         )
       : null;
 
@@ -510,77 +443,38 @@ export class BinanceService {
       );
     }
 
-    const quantity = Math.abs(positionAmt);
-
-    const queryParams: Record<string, string | number> = {
+    const res = await client.restAPI!.newOrder({
       symbol: params.symbol,
-      side: params.side,
-      type: OrderType.MARKET,
-      quantity,
+      side: params.side as any,
+      type: OrderType.MARKET as any,
+      quantity: Math.abs(positionAmt),
       reduceOnly: "true",
-    };
-
-    return this.makeSignedRequest(
-      apiKey,
-      apiSecret,
-      params.useTestnet,
-      "POST",
-      BINANCE_ENDPOINTS.FUTURES_ORDER,
-      queryParams,
-    );
-  }
-
-  async cancelTpSl(
-    apiKey: string,
-    apiSecret: string,
-    params: CancelTpSlParams,
-  ) {
-    if (!params.algoId) {
-      throw Object.assign(new Error("Algo ID is required."), { status: 400 });
-    }
-
-    if (!params.clientAlgoId) {
-      throw Object.assign(new Error("Client Algo ID is required."), {
-        status: 400,
-      });
-    }
-
-    const queryParams: Record<string, number | string> = {
-      algoId: params.algoId,
-      clientAlgoId: params.clientAlgoId,
-    };
-
-    return this.makeSignedRequest(
-      apiKey,
-      apiSecret,
-      params.useTestnet,
-      "DELETE",
-      BINANCE_ENDPOINTS.FUTURES_ALGO_ORDER,
-      queryParams,
-    );
+    });
+    return res.data();
   }
 
   async cancelOrder(
     apiKey: string,
     apiSecret: string,
     params: CancelOrderParams,
-  ) {
-    const queryParams: Record<string, string | number> = {
-      symbol: params.symbol,
-    };
-    if (params.origClientOrderId) {
-      queryParams.origClientOrderId = params.origClientOrderId;
-    } else if (params.orderId) {
-      queryParams.orderId = params.orderId;
+  ): Promise<any> {
+    if (!params.orderId && !params.origClientOrderId) {
+      throw Object.assign(
+        new Error("Either orderId or origClientOrderId is required."),
+        { status: 400 },
+      );
     }
 
-    return this.makeSignedRequest(
-      apiKey,
-      apiSecret,
-      params.useTestnet,
-      "DELETE",
-      BINANCE_ENDPOINTS.FUTURES_ORDER,
-      queryParams,
-    );
+    const client = createFuturesClient(apiKey, apiSecret, params.useTestnet);
+
+    const cancelParams: any = { symbol: params.symbol };
+    if (params.origClientOrderId) {
+      cancelParams.origClientOrderId = params.origClientOrderId;
+    } else if (params.orderId) {
+      cancelParams.orderId = params.orderId;
+    }
+
+    const res = await client.restAPI!.cancelOrder(cancelParams);
+    return res.data();
   }
 }
