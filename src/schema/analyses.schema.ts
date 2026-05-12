@@ -1,10 +1,10 @@
 import mongoose, { Schema, Document } from "mongoose";
-import type { AIResponseData } from "../models/ai.model.js";
+import type { AIResponse } from "../models/ai.model.js";
 
 export interface IAnalyses extends Document {
   status: string;
   message: string;
-  response: AIResponseData;
+  response: AIResponse;
 }
 
 const AnalysesSchema: Schema = new Schema(
