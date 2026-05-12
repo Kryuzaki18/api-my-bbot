@@ -8,13 +8,7 @@ export enum AIType {
 export interface AIResponse {
   status: string;
   message: string;
-  response: AIResponseData | null;
-}
-
-export interface AIResponseData {
-  signal: AISignal;
-  buy: AIResponseDataEntry[];
-  sell: AIResponseDataEntry[];
+  response: AISignal | null;
 }
 
 export interface AISignal {
@@ -36,14 +30,4 @@ export interface AIConfidence {
     volume: number;
     structure: number;
   };
-}
-
-export interface AIResponseDataEntry {
-  indicators: string[];
-  pattern: string[];
-  entryZone: number[];
-  sl: number;
-  tp: number;
-  leverage: number;
-  riskReward: number;
 }

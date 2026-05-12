@@ -57,7 +57,7 @@ const chatRules = [
   }`,
 ];
 
-const tradeBotRules = [
+const genericRules = [
   `If marketData is missing or empty return this format
   { 
     status: "rejected", 
@@ -69,38 +69,10 @@ const tradeBotRules = [
 
   `signal MUST be based on leverage + timeframe + risk rules`,
 
-  `buy and sell MUST NOT include confidence. They inherit confidence from signal.`,
-
   `Extreme leverage (35x–50x) is ONLY allowed if:
   - timeframe = scalp (3m–15m)
   - confidence score ≥ 80
   - RR ≥ 2.0`,
-
-  `Return ONLY a JSON object with these exact format
-  { 
-    status: "accepted", 
-    message: string, 
-    response: {
-      signal: {
-        type: "buy | sell",
-        entryZone: [number, number],
-        sl: number,
-        tp: number,
-        leverage: number,
-        riskReward: number,
-        reasoning: string,
-        confidence: {
-          score: number,
-          components: {
-            trend: number,
-            momentum: number,
-            volume: number,
-            structure: number
-          }
-        }
-      },
-    }
-  }`,
   `ANALYZE the signal based on the confluence of indicators and patterns coming from the data fetched.`,
   "NEVER break JSON structure.",
   "NEVER hallucinate data.",
@@ -109,98 +81,66 @@ const tradeBotRules = [
   "NEVER fabricate: Prices, Indicators, Signals, Market structure.",
 ];
 
-const rules = [
-  `If marketData is missing or empty return this format
+const tradeBotRules = [
+  `Return ONLY a JSON object with these exact format
   { 
-    status: "rejected", 
-    message: "Market data is missing or empty, cannot generate setup.", 
-    response: null
+    status: "accepted", 
+    response: {
+      type: "buy | sell",
+      entryZone: [number, number],
+      sl: number,
+      tp: number,
+      leverage: number,
+      riskReward: number,
+      reasoning: string,
+      confidence: {
+        score: number,
+        components: {
+          trend: number,
+          momentum: number,
+          volume: number,
+          structure: number
+        }
+      }
+    }
   }`,
+];
 
-  `If confluence is NOT met → DO NOT generate the setup and return this JSON object format
-  { 
-    status: "rejected", 
-    message: "Confluence is not met, cannot generate setup.", 
-    response: null
-  }`,
-
-  `The AI MUST NOT fetch or assume external data.`,
-
-  `signal MUST be based on leverage + timeframe + risk rules`,
-
-  `buy and sell MUST NOT include confidence. They inherit confidence from signal.`,
-
-  `buy and sell, provide 3 scenarios.
-  - Scenario 1 (Low Risk)
-  - Scenario 2 (Medium Risk)
-  - Scenario 3 (High Risk)`,
-
-  `Extreme leverage (35x–50x) is ONLY allowed if:
-  - timeframe = scalp (3m–15m)
-  - confidence score ≥ 80
-  - RR ≥ 2.0`,
-
+const analyzeRules = [
+  `For the message property ALWAYS provide analysis for today's 1d timeframe max 200 words ONLY.`,
   `Return ONLY a JSON object with these exact format
   { 
     status: "accepted", 
     message: string, 
     response: {
-      signal: {
-        type: "buy | sell",
-        entryZone: [number, number],
-        sl: number,
-        tp: number,
-        leverage: number,
-        riskReward: number,
-        reasoning: string,
-        confidence: {
-          score: number,
-          components: {
-            trend: number,
-            momentum: number,
-            volume: number,
-            structure: number
-          }
+      indicators: [],
+      pattern: [],
+      type: "buy | sell",
+      entryZone: [number, number],
+      sl: number,
+      tp: number,
+      leverage: number,
+      riskReward: number,
+      reasoning: string,
+      confidence: {
+        score: number,
+        components: {
+          trend: number,
+          momentum: number,
+          volume: number,
+          structure: number
         }
-      },
-      buy: [
-        { 
-          indicators: ["string", "string"],
-          pattern: ["string"],
-          leverage: number, 
-          entryZone: [number, number],
-          sl: number,
-          tp: number,
-          riskReward: number
-        }
-      ],
-      sell: [
-        { 
-          indicators: ["string", "string"],
-          pattern: ["string"],
-          leverage: number,
-          entryZone: [number, number],
-          sl: number,
-          tp: number,
-          riskReward: number
-        }
-      ]
+      }
     }
   }`,
-  `For the message property ALWAYS provide analysis for today's 1d timeframe max 200 words ONLY.`,
-  `ANALYZE the signal, buy and sell based on the confluence of indicators and patterns coming from the data fetched.`,
-  "NEVER break JSON structure.",
-  "NEVER hallucinate data.",
-  "NEVER skip validation rules.",
-  "NEVER provide analysis without confluence.",
-  "NEVER fabricate: Prices, Indicators, Signals, Market structure.",
 ];
 
 export const AI_ANALYZE_MARKET_TEMPLATE = `
 ${scopes.join("\n")}
 ${standards.join("\n")}
 ${setup.join("\n")}
-${rules.join("\n")}
+${genericRules.join("\n")}
+${analyzeRules.join("\n")}
 `;
 
 export const AI_CHAT_PROMPTS_TEMPLATE = `
@@ -212,6 +152,7 @@ export const AI_TRADE_BOT_TEMPLATE = `
 ${scopes.join("\n")}
 ${standards.join("\n")}
 ${setup.join("\n")}
+${genericRules.join("\n")}
 ${tradeBotRules.join("\n")}
 `;
 

@@ -62,14 +62,14 @@ export class TradeBotService {
       await geminiService.analyze(input.symbol, input.interval, input.type ?? AIType.GENERAL),
     );
 
-    if (analysis?.status !== "accepted" || !analysis?.response?.signal) {
+    if (analysis?.status !== "accepted" || !analysis?.response) {
       throw Object.assign(
         new Error(analysis?.message || "AI confluence not met. No trade executed."),
         { status: 400 },
       );
     }
 
-    const signal = analysis.response.signal as AISignal;
+    const signal = analysis.response as AISignal;
     const entryPrice = (Number(signal.entryZone?.[0]) + Number(signal.entryZone?.[1])) / 2;
     const orderSide = this.getOrderSide(signal.type);
     const exitSide = this.getExitSide(orderSide);
