@@ -159,4 +159,5 @@ ${tradeBotRules.join("\n")}
 export const AI_MODELS = {
   GEMINI_BASIC: "gemini-flash-latest",
   GEMINI_PRO: "gemini-3.1-pro-preview",
+  CLAUDE: "claude-opus-4-8",
 };

@@ -10,6 +10,7 @@ const schema = Type.Object({
   MONGODB_URI: Type.String({ minLength: 10 }),
   CLIENT_ORIGIN: Type.String({ minLength: 1 }),
   GEMINI_API_KEY: Type.String({ minLength: 1 }),
+  CLAUDE_API_KEY: Type.String({ minLength: 1 }),
 });
 
 type EnvConfig = Static<typeof schema>;
