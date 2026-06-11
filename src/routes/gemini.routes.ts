@@ -4,11 +4,17 @@ import { Type } from "@sinclair/typebox";
 import { GeminiService } from "../services/gemini.service.js";
 import { ROUTES } from "../config/app-routes.js";
 
+const ConversationMessageSchema = Type.Object({
+  role: Type.Union([Type.Literal("user"), Type.Literal("assistant")]),
+  content: Type.String(),
+});
+
 const AIChatSchema = {
   description: "AI Chat.",
   tags: ["AI Chat"],
   body: Type.Object({
     message: Type.String({ minLength: 3 }),
+    history: Type.Optional(Type.Array(ConversationMessageSchema)),
   }),
   response: {
     200: Type.Any(),
@@ -51,13 +57,13 @@ const geminiRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     { schema: AIChatSchema },
     async (request, reply) => {
       try {
-        const { message } = request.body as any;
+        const { message, history = [] } = request.body as any;
 
         if (message === undefined) {
           return reply.code(400).send({ error: "Invalid request." });
         }
 
-        const result = await geminiService.chat(message);
+        const result = await geminiService.chat(message, history);
         return reply.code(200).send(result);
       } catch (error: any) {
         request.log.error(error);

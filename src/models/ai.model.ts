@@ -1,5 +1,10 @@
 import type { OrderSide } from "./order.model.js";
 
+export interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export enum AIType {
   GENERAL = "general",
   TRADE_BOT = "trade-bot",
