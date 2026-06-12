@@ -6,6 +6,11 @@ const scopes = [
   "Your scope is STRICTLY LIMITED to cryptocurrency trading and financial market analysis.",
 ];
 
+const chatScopes = [
+  `You are a cryptocurrency trading assistant AI specializing in:
+  - Answering questions about cryptocurrency trading and financial markets`
+];
+
 const standards = [
   "Focus on probabilities, not certainties.",
   "Use confluence-based decision making.",
@@ -144,7 +149,7 @@ ${analyzeRules.join("\n")}
 `;
 
 export const AI_CHAT_PROMPTS_TEMPLATE = `
-${scopes.join("\n")}
+${chatScopes.join("\n")}
 ${chatRules.join("\n")}
 `;
 
@@ -159,4 +164,8 @@ ${tradeBotRules.join("\n")}
 export const AI_MODELS = {
   GEMINI_BASIC: "gemini-flash-latest",
   GEMINI_PRO: "gemini-3.1-pro-preview",
+  CLAUDE_FABLE_5: "claude-fable-5",
+  CLAUDE_4_8: "claude-opus-4-8",
+  CLAUDE_4_6: "claude-sonnet-4-6",
+  CLAUDE_HAIKU_4_5: "claude-haiku-4-5-20251001",
 };

@@ -8,7 +8,7 @@ import {
 import { RESPONSE_MESSAGES } from "../constants/auth.constant.js";
 import { BinanceService } from "./binance.service.js";
 import Analyses, { type IAnalyses } from "../schema/analyses.schema.js";
-import { AIType, type AIResponse } from "../models/ai.model.js";
+import { AIType, type AIResponse, type ConversationMessage } from "../models/ai.model.js";
 
 export class GeminiService {
   binanceService = new BinanceService();
@@ -23,41 +23,37 @@ export class GeminiService {
     this.genAI = new GoogleGenerativeAI(geminiApiKey);
   }
 
-  async chat(message: string) {
-    const prompt = AI_CHAT_PROMPTS_TEMPLATE.concat("\n" + message);
+  async chat(message: string, history: ConversationMessage[] = []) {
     const plan = 0;
     const basicModel = this.genAI.getGenerativeModel({
       model: !plan ? AI_MODELS.GEMINI_BASIC : AI_MODELS.GEMINI_PRO,
+      systemInstruction: AI_CHAT_PROMPTS_TEMPLATE,
       generationConfig: {
         responseMimeType: "application/json",
       },
     });
 
-    let aiText = "";
+    const geminiHistory = history.map((msg) => ({
+      role: msg.role === "user" ? "user" : "model",
+      parts: [{ text: msg.content }],
+    }));
+
+    const sendAndParse = async () => {
+      const chatSession = basicModel.startChat({ history: geminiHistory });
+      const result = await chatSession.sendMessage(message);
+      const res = result.response.text();
+      return typeof res === "string" ? JSON.parse(res) : res;
+    };
 
     try {
-      const result = await basicModel.generateContent([{ text: prompt }]);
-      const res = result.response.text();
-      aiText = typeof res === "string" ? JSON.parse(res) : res;
-
-      if (!aiText) {
-        throw new Error(RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
-      }
-
+      const aiText = await sendAndParse();
+      if (!aiText) throw new Error(RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
       return aiText;
     } catch (err: any) {
       if (err.status === 429) {
-        // 429 is "Too Many Requests" - Rate limit hit, waiting 30 seconds...
         await this.delay(30000);
-
-        const result = await basicModel.generateContent([{ text: prompt }]);
-        const res = result.response.text();
-        aiText = typeof res === "string" ? JSON.parse(res) : res;
-
-        if (!aiText) {
-          throw new Error(RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
-        }
-
+        const aiText = await sendAndParse();
+        if (!aiText) throw new Error(RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         return aiText;
       }
       throw err;
