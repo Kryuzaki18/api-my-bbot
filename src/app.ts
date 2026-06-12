@@ -5,7 +5,6 @@ import fastifyCookie from "@fastify/cookie";
 import fastifyRateLimit from "@fastify/rate-limit";
 import fastifyHelmet from "@fastify/helmet";
 import { type TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
-// import fastifyHttpProxy from "@fastify/http-proxy";
 
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
@@ -88,32 +87,6 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(fastifySwaggerUi, { routePrefix: "/docs" });
 
   app.get("/swagger.json", async () => app.swagger());
-
-  // await app.register(fastifyHttpProxy, {
-  //   upstream: "https://fapi.binance.com",
-  //   prefix: "/fapi",
-  //   rewritePrefix: "/fapi",
-  // });
-
-  // await app.register(fastifyHttpProxy, {
-  //   upstream: "https://demo-fapi.binance.com",
-  //   prefix: "/demo-fapi",
-  //   rewritePrefix: "",
-  // });
-
-  // await app.register(fastifyHttpProxy, {
-  //   upstream: "wss://fstream.binance.com",
-  //   prefix: "/fstream-proxy",
-  //   rewritePrefix: "",
-  //   websocket: true,
-  // });
-  
-  // await app.register(fastifyHttpProxy, {
-  //   upstream: "wss://fstream.binancefuture.com",
-  //   prefix: "/fstream-testnet-proxy",
-  //   rewritePrefix: "",
-  //   websocket: true,
-  // });
 
   connectDB(app.config.MONGODB_URI).catch((err) => {
     app.log.error({ err }, "[MongoDB] Failed to connect");

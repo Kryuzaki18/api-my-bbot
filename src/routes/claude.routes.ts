@@ -6,7 +6,6 @@ import { ROUTES } from "../config/app-routes.js";
 import { sessionHook } from "../hooks/session.hook.js";
 import Conversation from "../schema/conversation.schema.js";
 import { BearerAuth, StandardErrors } from "../schemas/shared.schema.js";
-import { MAX_HISTORY_MESSAGES } from "../constants/auth.constant.js";
 
 const AIChatSchema = {
   description: "Claude AI Chat. History is managed server-side per session (authenticated or anonymous).",
@@ -84,23 +83,7 @@ const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
           content: m.content,
         }));
 
-        const result = await claudeService.chat(message, history);
-
-        await Conversation.findOneAndUpdate(
-          { identifier },
-          {
-            $push: {
-              messages: {
-                $each: [
-                  { role: "user", content: message },
-                  { role: "assistant", content: result.message },
-                ],
-                $slice: -MAX_HISTORY_MESSAGES,
-              },
-            },
-          },
-          { upsert: true },
-        );
+        const result = await claudeService.chat(message, history, identifier);
 
         return reply.code(200).send(result);
       } catch (error: any) {
