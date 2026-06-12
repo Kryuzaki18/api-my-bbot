@@ -30,7 +30,7 @@ const TradeBotSchema = {
 const tradeBotRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   fastify.addHook("onRequest", authHook);
 
-  fastify.post(ROUTES.TRADE_BOT, { schema: TradeBotSchema }, async (request, reply) => {
+  fastify.post(ROUTES.GEMINI_TRADE_BOT, { schema: TradeBotSchema }, async (request, reply) => {
     try {
       const { apiKey, apiSecret, useTestnet } = request.user;
       const body = request.body as any;

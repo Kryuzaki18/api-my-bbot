@@ -1,13 +1,14 @@
 export const ROUTES = {
   CHAT_HISTORY: '/api/history',
 
-  GEMINI_CHAT: '/api/chat',
-  GEMINI_ANALYZE_MARKET: '/api/analyze-market',
+  GEMINI_CHAT: '/api/g/chat',
+  GEMINI_ANALYZE_MARKET: '/api/g/analyze-market',
+  GEMINI_TRADE_BOT: '/api/g/trade-bot',
 
-  CLAUDE_ANALYZE_MARKET: '/api/analyze-market',
-  CLAUDE_CHAT: '/api/chat',
+  CLAUDE_ANALYZE_MARKET: '/api/c/analyze-market',
+  CLAUDE_CHAT: '/api/c/chat',
+  CLAUDE_TRADE_BOT: '/api/c/trade-bot',
 
-  TRADE_BOT: '/api/trade-bot',
   SIGN_UP: '/api/auth/signup',
   SIGN_IN: '/api/auth/signin',
   SIGN_IN_EMAIL: '/api/auth/signin-email',
