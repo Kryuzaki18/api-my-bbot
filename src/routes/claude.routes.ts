@@ -44,6 +44,7 @@ const HistoryGetSchema = {
     200: Type.Array(
       Type.Object({
         role: Type.Union([Type.Literal("user"), Type.Literal("assistant")]),
+        status: Type.Union([Type.Literal("accepted"), Type.Literal("rejected")]),
         content: Type.String(),
         createdAt: Type.String(),
       }),
@@ -99,8 +100,7 @@ const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
       try {
         const identifier = request.sessionIdentifier;
         const conv = await Conversation.findOne({ identifier }).lean();
-        const messages = (conv?.messages ?? []).filter((m) => m.status === "accepted");
-        return reply.code(200).send(messages);
+        return reply.code(200).send(conv?.messages ?? []);
       } catch (error: any) {
         request.log.error(error);
         return reply.code(500).send({ error: "Internal Server Error", details: error.message });
