@@ -6,14 +6,18 @@ import Conversation from "../schema/conversation.schema.js";
 import { BearerAuth, StandardErrors } from "../schemas/shared.schema.js";
 
 const HistoryGetSchema = {
-  description: "Get chat history for the current session (authenticated or anonymous).",
+  description:
+    "Get chat history for the current session (authenticated or anonymous).",
   tags: ["AI Chat"],
   security: BearerAuth,
   response: {
     200: Type.Array(
       Type.Object({
         role: Type.Union([Type.Literal("user"), Type.Literal("assistant")]),
-        status: Type.Union([Type.Literal("accepted"), Type.Literal("rejected")]),
+        status: Type.Union([
+          Type.Literal("accepted"),
+          Type.Literal("rejected"),
+        ]),
         content: Type.String(),
         createdAt: Type.String(),
       }),
@@ -35,7 +39,10 @@ const HistoryDeleteSchema = {
 const chatRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   fastify.get(
     ROUTES.CHAT_HISTORY,
-    { schema: HistoryGetSchema },
+    {
+      schema: HistoryGetSchema,
+      config: { rateLimit: { max: 50, timeWindow: "1 minute" } },
+    },
     async (request, reply) => {
       try {
         const identifier = request.sessionIdentifier;
@@ -45,14 +52,19 @@ const chatRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         return reply.code(200).send(conv?.messages ?? []);
       } catch (error: any) {
         request.log.error(error);
-        return reply.code(500).send({ error: "Internal Server Error", details: error.message });
+        return reply
+          .code(500)
+          .send({ error: "Internal Server Error", details: error.message });
       }
     },
   );
 
   fastify.delete(
     ROUTES.CHAT_HISTORY,
-    { schema: HistoryDeleteSchema },
+    {
+      schema: HistoryDeleteSchema,
+      config: { rateLimit: { max: 3, timeWindow: "1 minute" } },
+    },
     async (request, reply) => {
       try {
         const identifier = request.sessionIdentifier;
@@ -64,7 +76,9 @@ const chatRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         return reply.code(200).send({ message: "Conversation cleared." });
       } catch (error: any) {
         request.log.error(error);
-        return reply.code(500).send({ error: "Internal Server Error", details: error.message });
+        return reply
+          .code(500)
+          .send({ error: "Internal Server Error", details: error.message });
       }
     },
   );

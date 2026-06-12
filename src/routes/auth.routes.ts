@@ -1,4 +1,9 @@
-import { type FastifyInstance, type FastifyPluginAsync, type FastifyReply, type FastifyRequest } from "fastify";
+import {
+  type FastifyInstance,
+  type FastifyPluginAsync,
+  type FastifyReply,
+  type FastifyRequest,
+} from "fastify";
 import { Type } from "@sinclair/typebox";
 import bcrypt from "bcrypt";
 
@@ -50,7 +55,9 @@ async function mergeAnonHistory(
   }
 
   const anonIdentifier = `anon:${anonymousId}`;
-  const anonConv = await Conversation.findOne({ identifier: anonIdentifier }).lean();
+  const anonConv = await Conversation.findOne({
+    identifier: anonIdentifier,
+  }).lean();
 
   if (!anonConv || anonConv.messages.length === 0) {
     reply.clearCookie(ANON_COOKIE_NAME, { path: "/" });
@@ -177,64 +184,70 @@ const SwitchModeSchema = {
 };
 
 const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
-  fastify.post(ROUTES.SIGN_UP, { schema: SignupSchema }, async (request, reply) => {
-    const { email, password, binanceKeys } = request.body as {
-      email: string;
-      password: string;
-      binanceKeys: {
-        test: { apiKey: string; apiSecret: string };
-        prod: { apiKey: string; apiSecret: string };
-      };
-    };
-
-    if (!EMAIL_REGEX.test(email)) {
-      return reply.code(422).send({ error: "Invalid email address format" });
-    }
-
-    const existingByEmail = await User.findOne({
-      email: email.toLowerCase().trim(),
-    }).lean();
-
-    if (existingByEmail) {
-      return reply
-        .code(409)
-        .send({ error: "Email address is already taken", field: "email" });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-
-    try {
-      await User.create({
-        email: email.toLowerCase().trim(),
-        password: hashedPassword,
+  fastify.post(
+    ROUTES.SIGN_UP,
+    { schema: SignupSchema },
+    async (request, reply) => {
+      const { email, password, binanceKeys } = request.body as {
+        email: string;
+        password: string;
         binanceKeys: {
-          test: {
-            apiKey: binanceKeys.test.apiKey,
-            apiSecret: binanceKeys.test.apiSecret,
-          },
-          prod: {
-            apiKey: binanceKeys.prod.apiKey,
-            apiSecret: binanceKeys.prod.apiSecret,
-          },
-        },
-      });
+          test: { apiKey: string; apiSecret: string };
+          prod: { apiKey: string; apiSecret: string };
+        };
+      };
 
-      return reply.code(201).send({ message: "Account created successfully" });
-    } catch (error: any) {
-      if (error.code === 11000) {
-        const field = Object.keys(error.keyPattern ?? {})[0] ?? "field";
-        return reply.code(409).send({
-          error: `${field.charAt(0).toUpperCase() + field.slice(1)} is already taken`,
-          field,
+      if (!EMAIL_REGEX.test(email)) {
+        return reply.code(422).send({ error: "Invalid email address format" });
+      }
+
+      const existingByEmail = await User.findOne({
+        email: email.toLowerCase().trim(),
+      }).lean();
+
+      if (existingByEmail) {
+        return reply
+          .code(409)
+          .send({ error: "Email address is already taken", field: "email" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+      try {
+        await User.create({
+          email: email.toLowerCase().trim(),
+          password: hashedPassword,
+          binanceKeys: {
+            test: {
+              apiKey: binanceKeys.test.apiKey,
+              apiSecret: binanceKeys.test.apiSecret,
+            },
+            prod: {
+              apiKey: binanceKeys.prod.apiKey,
+              apiSecret: binanceKeys.prod.apiSecret,
+            },
+          },
+        });
+
+        return reply
+          .code(201)
+          .send({ message: "Account created successfully" });
+      } catch (error: any) {
+        if (error.code === 11000) {
+          const field = Object.keys(error.keyPattern ?? {})[0] ?? "field";
+          return reply.code(409).send({
+            error: `${field.charAt(0).toUpperCase() + field.slice(1)} is already taken`,
+            field,
+          });
+        }
+        request.log.error(error);
+        return reply.code(400).send({
+          error: error.message || "Failed to create account",
+          details: error.errors,
         });
       }
-      request.log.error(error);
-      return reply.code(400).send({
-        error: error.message || "Failed to create account",
-        details: error.errors,
-      });
-    }
-  });
+    },
+  );
 
   fastify.get(ROUTES.ME, { schema: MeSchema }, async (request, reply) => {
     try {
@@ -277,7 +290,11 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
           useTestnet: boolean;
         };
 
-        await binanceService.getAccountInformation(apiKey, apiSecret, useTestnet);
+        await binanceService.getAccountInformation(
+          apiKey,
+          apiSecret,
+          useTestnet,
+        );
 
         const token = fastify.jwt.sign(
           { apiKey, apiSecret, useTestnet },
@@ -286,7 +303,9 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
 
         reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
 
-        const anonToken = (request.cookies as Record<string, string | undefined>)[ANON_COOKIE_NAME];
+        const anonToken = (
+          request.cookies as Record<string, string | undefined>
+        )[ANON_COOKIE_NAME];
         await mergeAnonHistory(fastify, anonToken, `key:${apiKey}`, reply);
 
         return reply.code(200).send({ message: "Signed in successfully" });
@@ -294,11 +313,16 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         if (error.status && error.status >= 400 && error.status < 500) {
           return reply
             .code(401)
-            .send({ error: error.details?.msg || "Invalid API Keys or unauthorized." });
+            .send({
+              error: error.details?.msg || "Invalid API Keys or unauthorized.",
+            });
         }
         return reply
           .code(400)
-          .send({ error: error.message || "Failed to sign in", details: error.details });
+          .send({
+            error: error.message || "Failed to sign in",
+            details: error.details,
+          });
       }
     },
   );
@@ -318,7 +342,9 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         };
 
         if (!EMAIL_REGEX.test(email)) {
-          return reply.code(401).send({ error: "Invalid email address format" });
+          return reply
+            .code(401)
+            .send({ error: "Invalid email address format" });
         }
 
         const user = await User.findOne({
@@ -329,7 +355,10 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         const dummyHash =
           "$2b$12$invalidhashfortimingattackprevention000000000000000000";
         const passwordToCompare = user?.password ?? dummyHash;
-        const isPasswordValid = await bcrypt.compare(password, passwordToCompare);
+        const isPasswordValid = await bcrypt.compare(
+          password,
+          passwordToCompare,
+        );
 
         if (!user || !isPasswordValid) {
           return reply.code(401).send({ error: "Invalid email or password" });
@@ -342,7 +371,9 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
 
         reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
 
-        const anonToken = (request.cookies as Record<string, string | undefined>)[ANON_COOKIE_NAME];
+        const anonToken = (
+          request.cookies as Record<string, string | undefined>
+        )[ANON_COOKIE_NAME];
         await mergeAnonHistory(fastify, anonToken, user.email, reply);
 
         return reply.code(200).send({ message: "Signed in successfully" });
@@ -354,66 +385,85 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         }
         return reply
           .code(400)
-          .send({ error: error.message || "Failed to sign in", details: error.details });
+          .send({
+            error: error.message || "Failed to sign in",
+            details: error.details,
+          });
       }
     },
   );
 
-  fastify.post(ROUTES.SIGN_OUT, { schema: SignoutSchema }, async (_request, reply) => {
-    // Clear auth session only. The anon_session cookie is intentionally kept so
-    // the user can continue chatting anonymously after signing out and their
-    // history persists if they sign back in.
-    reply.clearCookie(COOKIE_NAME, { path: "/" });
-    return reply.code(200).send({ message: "Signed out successfully" });
-  });
+  fastify.post(
+    ROUTES.SIGN_OUT,
+    { schema: SignoutSchema },
+    async (_request, reply) => {
+      // Clear auth session only. The anon_session cookie is intentionally kept so
+      // the user can continue chatting anonymously after signing out and their
+      // history persists if they sign back in.
+      reply.clearCookie(COOKIE_NAME, { path: "/" });
+      return reply.code(200).send({ message: "Signed out successfully" });
+    },
+  );
 
-  fastify.post(ROUTES.SWITCH_MODE, { schema: SwitchModeSchema }, async (request, reply) => {
-    try {
-      await request.jwtVerify();
-      const { useTestnet } = request.body as { useTestnet: boolean };
+  fastify.post(
+    ROUTES.SWITCH_MODE,
+    { schema: SwitchModeSchema },
+    async (request, reply) => {
+      try {
+        await request.jwtVerify();
+        const { useTestnet } = request.body as { useTestnet: boolean };
 
-      const { email, apiKey, apiSecret } = request.user;
-      let payload: { email?: string; apiKey?: string; apiSecret?: string; useTestnet: boolean };
+        const { email, apiKey, apiSecret } = request.user;
+        let payload: {
+          email?: string;
+          apiKey?: string;
+          apiSecret?: string;
+          useTestnet: boolean;
+        };
 
-      if (email) {
-        const user = await User.findOne({ email }).lean();
-        if (!user) return reply.code(401).send({ error: "Session expired or invalid" });
+        if (email) {
+          const user = await User.findOne({ email }).lean();
+          if (!user)
+            return reply
+              .code(401)
+              .send({ error: "Session expired or invalid" });
 
-        const keys = useTestnet ? user.binanceKeys.test : user.binanceKeys.prod;
-        try {
-          await binanceService.getAccountInformation(keys.apiKey, keys.apiSecret, useTestnet);
-        } catch {
-          return reply.code(401).send({
-            error: `API keys are not valid for ${useTestnet ? "demo" : "live"} mode. Check your ${useTestnet ? "testnet" : "production"} Binance API keys.`,
-          });
+          const keys = useTestnet
+            ? user.binanceKeys.test
+            : user.binanceKeys.prod;
+          try {
+            await binanceService.getAccountInformation(
+              keys.apiKey,
+              keys.apiSecret,
+              useTestnet,
+            );
+          } catch (err: any) {
+            if (err?.status === 401 || err?.status === 403) {
+              return reply.code(401).send({
+                error: `Cannot switch to ${useTestnet ? "demo" : "live"} mode: your ${useTestnet ? "testnet" : "production"} Binance API keys were rejected. Verify the keys are correct, have Futures trading enabled, and your server IP is whitelisted in Binance if IP restrictions are set.`,
+              });
+            }
+          }
+
+          payload = { email, useTestnet };
+        } else if (apiKey && apiSecret) {
+          payload = { apiKey, apiSecret, useTestnet };
+        } else {
+          return reply.code(401).send({ error: "Session expired or invalid" });
         }
 
-        payload = { email, useTestnet };
-      } else if (apiKey && apiSecret) {
-        try {
-          await binanceService.getAccountInformation(apiKey, apiSecret, useTestnet);
-        } catch {
-          return reply.code(401).send({
-            error: `API keys are not valid for ${useTestnet ? "demo" : "live"} mode. Sign in with API keys that have access to ${useTestnet ? "testnet" : "production"}.`,
-          });
-        }
+        const token = fastify.jwt.sign(payload, { expiresIn: "7d" });
+        reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
 
-        payload = { apiKey, apiSecret, useTestnet };
-      } else {
+        return reply.code(200).send({
+          message: `Switched to ${useTestnet ? "demo" : "live"} mode successfully`,
+          useTestnet,
+        });
+      } catch {
         return reply.code(401).send({ error: "Session expired or invalid" });
       }
-
-      const token = fastify.jwt.sign(payload, { expiresIn: "7d" });
-      reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
-
-      return reply.code(200).send({
-        message: `Switched to ${useTestnet ? "demo" : "live"} mode successfully`,
-        useTestnet,
-      });
-    } catch {
-      return reply.code(401).send({ error: "Session expired or invalid" });
-    }
-  });
+    },
+  );
 };
 
 export default authRoutes;

@@ -7,7 +7,8 @@ import Conversation from "../schema/conversation.schema.js";
 import { BearerAuth } from "../schemas/shared.schema.js";
 
 const AIChatSchema = {
-  description: "Claude AI Chat. History is managed server-side per session (authenticated or anonymous).",
+  description:
+    "Claude AI Chat. History is managed server-side per session (authenticated or anonymous).",
   tags: ["AI Chat"],
   security: BearerAuth,
   body: Type.Object({
@@ -15,8 +16,14 @@ const AIChatSchema = {
   }),
   response: {
     200: Type.Any(),
-    400: Type.Object({ error: Type.String(), details: Type.Optional(Type.Any()) }),
-    500: Type.Object({ error: Type.String(), details: Type.Optional(Type.Any()) }),
+    400: Type.Object({
+      error: Type.String(),
+      details: Type.Optional(Type.Any()),
+    }),
+    500: Type.Object({
+      error: Type.String(),
+      details: Type.Optional(Type.Any()),
+    }),
   },
 };
 
@@ -30,8 +37,14 @@ const AIAnalyzeSchema = {
   }),
   response: {
     200: Type.Any(),
-    400: Type.Object({ error: Type.String(), details: Type.Optional(Type.Any()) }),
-    500: Type.Object({ error: Type.String(), details: Type.Optional(Type.Any()) }),
+    400: Type.Object({
+      error: Type.String(),
+      details: Type.Optional(Type.Any()),
+    }),
+    500: Type.Object({
+      error: Type.String(),
+      details: Type.Optional(Type.Any()),
+    }),
   },
 };
 
@@ -40,33 +53,54 @@ const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
 
   fastify.post(
     ROUTES.CLAUDE_CHAT,
-    { schema: AIChatSchema },
+    {
+      schema: AIChatSchema,
+      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+    },
     async (request, reply) => {
       try {
         const { message } = request.body as { message: string };
         const identifier = request.sessionIdentifier;
 
-        const convo = await Conversation.findOne({ identifier, deletedAt: null }).sort({ createdAt: -1 }).lean();
+        const convo = await Conversation.findOne({
+          identifier,
+          deletedAt: null,
+        })
+          .sort({ createdAt: -1 })
+          .lean();
         const history = (convo?.messages ?? [])
           .filter((m) => m.status === "accepted")
           .map((m) => ({ role: m.role, content: m.content }));
-          
-        const result = await claudeService.chat(identifier, message, history, !!convo);
+
+        const result = await claudeService.chat(
+          identifier,
+          message,
+          history,
+          !!convo,
+        );
 
         return reply.code(200).send(result);
       } catch (error: any) {
         request.log.error(error);
-        return reply.code(500).send({ error: "Internal Server Error", details: error.message });
+        return reply
+          .code(500)
+          .send({ error: "Internal Server Error", details: error.message });
       }
     },
   );
 
   fastify.post(
     ROUTES.CLAUDE_ANALYZE_MARKET,
-    { schema: AIAnalyzeSchema },
+    {
+      schema: AIAnalyzeSchema,
+      config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
+    },
     async (request, reply) => {
       try {
-        const { symbol, interval } = request.body as { symbol: string; interval: string };
+        const { symbol, interval } = request.body as {
+          symbol: string;
+          interval: string;
+        };
 
         if (symbol === undefined || interval === undefined) {
           return reply.code(400).send({ error: "Invalid request." });
@@ -76,7 +110,9 @@ const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         return reply.code(200).send(result);
       } catch (error: any) {
         request.log.error(error);
-        return reply.code(500).send({ error: "Internal Server Error", details: error.message });
+        return reply
+          .code(500)
+          .send({ error: "Internal Server Error", details: error.message });
       }
     },
   );
