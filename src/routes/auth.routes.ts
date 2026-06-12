@@ -1,4 +1,4 @@
-import { type FastifyInstance, type FastifyPluginAsync, type FastifyReply } from "fastify";
+import { type FastifyInstance, type FastifyPluginAsync, type FastifyReply, type FastifyRequest } from "fastify";
 import { Type } from "@sinclair/typebox";
 import bcrypt from "bcrypt";
 
@@ -16,13 +16,16 @@ import { ErrorBody } from "../schemas/shared.schema.js";
 import User from "../schema/users.schema.js";
 import Conversation from "../schema/conversation.schema.js";
 
-const cookieOptions = (maxAgeSeconds: number) => ({
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-  path: "/",
-  maxAge: maxAgeSeconds,
-});
+const cookieOptions = (request: FastifyRequest, maxAgeSeconds: number) => {
+  const secure = request.protocol === "https";
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: (secure ? "none" : "lax") as "none" | "lax",
+    path: "/",
+    maxAge: maxAgeSeconds,
+  };
+};
 
 /**
  * After a successful sign-in, check whether the browser carries an anonymous
@@ -293,7 +296,7 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
           { expiresIn: "7d" },
         );
 
-        reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
+        reply.setCookie(COOKIE_NAME, token, cookieOptions(request, SEVEN_DAYS_SECONDS));
 
         // Carry over any anonymous chat history into this session
         const anonToken = (request.cookies as Record<string, string | undefined>)[ANON_COOKIE_NAME];
@@ -350,7 +353,7 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
           { expiresIn: "7d" },
         );
 
-        reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
+        reply.setCookie(COOKIE_NAME, token, cookieOptions(request, SEVEN_DAYS_SECONDS));
 
         // Carry over any anonymous chat history into this session
         const anonToken = (request.cookies as Record<string, string | undefined>)[ANON_COOKIE_NAME];
@@ -394,7 +397,7 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
       }
 
       const token = fastify.jwt.sign(payload, { expiresIn: "7d" });
-      reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
+      reply.setCookie(COOKIE_NAME, token, cookieOptions(request, SEVEN_DAYS_SECONDS));
 
       return reply.code(200).send({
         message: `Switched to ${useTestnet ? "demo" : "live"} mode successfully`,

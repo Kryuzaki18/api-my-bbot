@@ -36,7 +36,7 @@ declare module "fastify" {
 }
 
 export async function buildApp(): Promise<FastifyInstance> {
-  const app = fastify({ logger: true }).withTypeProvider<TypeBoxTypeProvider>();
+  const app = fastify({ logger: true, trustProxy: true }).withTypeProvider<TypeBoxTypeProvider>();
 
   await app.register(configEnv);
 

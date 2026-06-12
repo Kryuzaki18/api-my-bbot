@@ -21,7 +21,12 @@ export async function sessionHook(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const isProduction = process.env.NODE_ENV === "production";
+  // With trustProxy: true in Fastify, request.protocol correctly reflects the
+  // outer protocol (https) even when the Node process itself is on plain HTTP
+  // behind Nginx/ALB. Without this, secure: true gets set but the browser
+  // rejects the cookie because it came over what it sees as an HTTP hop.
+  const secure = request.protocol === "https";
+  const sameSite = secure ? ("none" as const) : ("lax" as const);
 
   try {
     await request.jwtVerify();
@@ -57,7 +62,7 @@ export async function sessionHook(
         return;
       }
     } catch {
-      reply.clearCookie(ANON_COOKIE_NAME, { path: "/" });
+      reply.clearCookie(ANON_COOKIE_NAME, { path: "/", secure, sameSite });
     }
   }
 
@@ -72,8 +77,8 @@ export async function sessionHook(
 
   reply.setCookie(ANON_COOKIE_NAME, anonToken, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: "lax" as const,
+    secure,
+    sameSite,
     path: "/",
     maxAge: THIRTY_DAYS_SECONDS,
   });
