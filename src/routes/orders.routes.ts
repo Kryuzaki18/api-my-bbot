@@ -111,7 +111,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     try {
       const { apiKey, apiSecret, useTestnet } = request.user;
       return reply.code(200).send(
-        await binanceService.getFuturesPositions(apiKey!, apiSecret!, useTestnet),
+        await binanceService.getFuturesPositions(apiKey!, apiSecret!, useTestnet ?? true),
       );
     } catch (error) {
       return sendError(reply, error);
@@ -122,7 +122,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     try {
       const { apiKey, apiSecret, useTestnet } = request.user;
       return reply.code(200).send(
-        await binanceService.getOpenOrders(apiKey!, apiSecret!, useTestnet),
+        await binanceService.getOpenOrders(apiKey!, apiSecret!, useTestnet ?? true),
       );
     } catch (error) {
       return sendError(reply, error);
@@ -133,7 +133,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     try {
       const { apiKey, apiSecret, useTestnet } = request.user;
       return reply.code(200).send(
-        await binanceService.getPendingTpSl(apiKey!, apiSecret!, useTestnet),
+        await binanceService.getPendingTpSl(apiKey!, apiSecret!, useTestnet ?? true),
       );
     } catch (error) {
       return sendError(reply, error);

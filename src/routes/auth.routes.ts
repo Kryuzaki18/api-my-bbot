@@ -1,4 +1,4 @@
-import { type FastifyInstance, type FastifyPluginAsync } from "fastify";
+import { type FastifyInstance, type FastifyPluginAsync, type FastifyReply } from "fastify";
 import { Type } from "@sinclair/typebox";
 import bcrypt from "bcrypt";
 
@@ -36,7 +36,7 @@ async function mergeAnonHistory(
   fastify: FastifyInstance,
   anonToken: string | undefined,
   userIdentifier: string,
-  reply: Parameters<FastifyPluginAsync>[1],
+  reply: FastifyReply,
 ): Promise<void> {
   if (!anonToken) return;
 

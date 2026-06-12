@@ -39,7 +39,7 @@ const tradeBotRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         geminiApiKey: fastify.config.GEMINI_API_KEY,
         apiKey: apiKey!,
         apiSecret: apiSecret!,
-        useTestnet,
+        useTestnet: useTestnet ?? true,
         symbol: body.symbol,
         interval: body.interval,
         usdAmount: body.usdAmount,

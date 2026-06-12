@@ -40,7 +40,7 @@ const userStreamRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
     try {
       const { apiKey, useTestnet } = request.user;
       return reply.code(200).send(
-        await binanceService.getListenKey(apiKey!, useTestnet),
+        await binanceService.getListenKey(apiKey!, useTestnet ?? true),
       );
     } catch (error) {
       return sendError(reply, error);
@@ -51,7 +51,7 @@ const userStreamRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
     try {
       const { apiKey, useTestnet } = request.user;
       return reply.code(200).send(
-        await binanceService.keepAliveListenKey(apiKey!, useTestnet),
+        await binanceService.keepAliveListenKey(apiKey!, useTestnet ?? true),
       );
     } catch (error) {
       return sendError(reply, error);
@@ -62,7 +62,7 @@ const userStreamRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
     try {
       const { apiKey, useTestnet } = request.user;
       return reply.code(200).send(
-        await binanceService.closeListenKey(apiKey!, useTestnet),
+        await binanceService.closeListenKey(apiKey!, useTestnet ?? true),
       );
     } catch (error) {
       return sendError(reply, error);

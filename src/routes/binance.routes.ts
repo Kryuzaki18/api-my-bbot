@@ -39,7 +39,7 @@ const binanceRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
       const symbol = body.symbol ? body.symbol.toUpperCase() : undefined;
 
       return reply.code(200).send(
-        await binanceService.getLeverageBracket(apiKey!, apiSecret!, useTestnet, symbol),
+        await binanceService.getLeverageBracket(apiKey!, apiSecret!, useTestnet ?? true, symbol),
       );
     } catch (error) {
       return sendError(reply, error);
@@ -52,7 +52,7 @@ const binanceRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
       const { symbols } = request.body as any;
 
       return reply.code(200).send(
-        await binanceService.getCommissionRate(apiKey!, apiSecret!, useTestnet, symbols),
+        await binanceService.getCommissionRate(apiKey!, apiSecret!, useTestnet ?? true, symbols),
       );
     } catch (error) {
       return sendError(reply, error);
