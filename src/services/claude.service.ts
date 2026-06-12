@@ -28,27 +28,50 @@ export class ClaudeService {
     this.client = new Anthropic({ apiKey: claudeApiKey });
   }
 
-  private extractJSON(text: string): any {
+  private extractJSON(text: string): any | null {
     const stripped = text.trim();
-    const match = stripped.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    return JSON.parse(match?.[1] ?? stripped);
+    const candidates: string[] = [];
+
+    const codeBlock = stripped.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (codeBlock?.[1]) candidates.push(codeBlock[1].trim());
+
+    const jsonObject = stripped.match(/\{[\s\S]*\}/);
+    if (jsonObject) candidates.push(jsonObject[0]);
+
+    candidates.push(stripped);
+
+    for (const candidate of candidates) {
+      try {
+        const result = JSON.parse(candidate);
+        if (result && typeof result === "object") return result;
+      } catch {
+      }
+    }
+
+    return null;
   }
 
   async chat(message: string, history: ConversationMessage[] = [], identifier: string) {
     const messages: Anthropic.MessageParam[] = [
-      ...history.map((msg) => ({
+      ...history.map((msg, index) => ({
         role: msg.role as "user" | "assistant",
-        content: msg.content,
+        content: index === history.length - 1
+          ? [{ type: "text" as const, text: msg.content, cache_control: { type: "ephemeral" as const } }]
+          : msg.content,
       })),
       { role: "user" as const, content: message },
     ];
 
     const stream = this.client.messages.stream({
-      model: AI_MODELS.CLAUDE,
+      model: AI_MODELS.CLAUDE_HAIKU_4_5,
       max_tokens: 1024,
-      system:
-        AI_CHAT_PROMPTS_TEMPLATE +
-        "\nReturn ONLY valid JSON. No markdown, no code blocks.",
+      system: [
+        {
+          type: "text",
+          text: AI_CHAT_PROMPTS_TEMPLATE + "\nReturn ONLY valid JSON. No markdown, no code blocks.",
+          cache_control: { type: "ephemeral" },
+        },
+      ],
       messages,
     });
 
@@ -60,7 +83,7 @@ export class ClaudeService {
     }
 
     const parsed = this.extractJSON(textBlock.text);
-    if (!parsed) throw new Error(RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+    if (!parsed) return { status: "rejected", message: RESPONSE_MESSAGES.SOMETHING_WENT_WRONG, response: null };
 
     const status = parsed.status as "accepted" | "rejected";
 
@@ -102,20 +125,27 @@ export class ClaudeService {
       type === AIType.GENERAL
         ? AI_ANALYZE_MARKET_TEMPLATE
         : AI_TRADE_BOT_TEMPLATE;
-    const dataPrompt =
-      `Here is the marketData for ${symbol} with timeframe ${interval}:\n` +
-      JSON.stringify(klines);
-    const prompt =
-      template +
-      "\n" +
-      dataPrompt +
-      "\nReturn ONLY valid JSON. No markdown, no code blocks.";
 
     const stream = this.client.messages.stream({
-      model: AI_MODELS.CLAUDE,
+      model: AI_MODELS.CLAUDE_4_8,
       max_tokens: 4096,
       thinking: { type: "adaptive" },
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: template + "\nReturn ONLY valid JSON. No markdown, no code blocks.",
+              cache_control: { type: "ephemeral" },
+            },
+            {
+              type: "text",
+              text: `Here is the marketData for ${symbol} with timeframe ${interval}:\n` + JSON.stringify(klines),
+            },
+          ],
+        },
+      ],
     });
 
     const response = await stream.finalMessage();
