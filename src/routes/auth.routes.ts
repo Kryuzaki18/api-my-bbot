@@ -26,14 +26,6 @@ const cookieOptions = (maxAgeSeconds: number) => {
   };
 };
 
-/**
- * After a successful sign-in, check whether the browser carries an anonymous
- * session cookie. If it does, append those messages to the authenticated user's
- * conversation, then delete the anonymous document and clear the cookie.
- *
- * This gives users a seamless transition: chat history they built while browsing
- * anonymously carries over the moment they log in.
- */
 async function mergeAnonHistory(
   fastify: FastifyInstance,
   anonToken: string | undefined,
@@ -53,7 +45,6 @@ async function mergeAnonHistory(
     if (!decoded.anonymousId || !decoded.isAnonymous) return;
     anonymousId = decoded.anonymousId;
   } catch {
-    // Expired or tampered cookie — nothing to merge, just clean up
     reply.clearCookie(ANON_COOKIE_NAME, { path: "/" });
     return;
   }
@@ -66,8 +57,6 @@ async function mergeAnonHistory(
     return;
   }
 
-  // Append anon messages after any existing authenticated history (they are newer —
-  // the user was chatting anonymously after a prior sign-out).
   await Conversation.findOneAndUpdate(
     { identifier: userIdentifier },
     {
@@ -297,7 +286,6 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
 
         reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
 
-        // Carry over any anonymous chat history into this session
         const anonToken = (request.cookies as Record<string, string | undefined>)[ANON_COOKIE_NAME];
         await mergeAnonHistory(fastify, anonToken, `key:${apiKey}`, reply);
 
@@ -354,7 +342,6 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
 
         reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
 
-        // Carry over any anonymous chat history into this session
         const anonToken = (request.cookies as Record<string, string | undefined>)[ANON_COOKIE_NAME];
         await mergeAnonHistory(fastify, anonToken, user.email, reply);
 
@@ -387,9 +374,30 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
 
       const { email, apiKey, apiSecret } = request.user;
       let payload: { email?: string; apiKey?: string; apiSecret?: string; useTestnet: boolean };
+
       if (email) {
+        const user = await User.findOne({ email }).lean();
+        if (!user) return reply.code(401).send({ error: "Session expired or invalid" });
+
+        const keys = useTestnet ? user.binanceKeys.test : user.binanceKeys.prod;
+        try {
+          await binanceService.getAccountInformation(keys.apiKey, keys.apiSecret, useTestnet);
+        } catch {
+          return reply.code(401).send({
+            error: `API keys are not valid for ${useTestnet ? "demo" : "live"} mode. Check your ${useTestnet ? "testnet" : "production"} Binance API keys.`,
+          });
+        }
+
         payload = { email, useTestnet };
       } else if (apiKey && apiSecret) {
+        try {
+          await binanceService.getAccountInformation(apiKey, apiSecret, useTestnet);
+        } catch {
+          return reply.code(401).send({
+            error: `API keys are not valid for ${useTestnet ? "demo" : "live"} mode. Sign in with API keys that have access to ${useTestnet ? "testnet" : "production"}.`,
+          });
+        }
+
         payload = { apiKey, apiSecret, useTestnet };
       } else {
         return reply.code(401).send({ error: "Session expired or invalid" });
