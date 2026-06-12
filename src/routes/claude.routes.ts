@@ -3,19 +3,13 @@ import { Type } from "@sinclair/typebox";
 
 import { ClaudeService } from "../services/claude.service.js";
 import { ROUTES } from "../config/app-routes.js";
-import { authHook } from "../hooks/auth.hook.js";
+import { sessionHook } from "../hooks/session.hook.js";
 import Conversation from "../schema/conversation.schema.js";
 import { BearerAuth, StandardErrors } from "../schemas/shared.schema.js";
-
-const MAX_HISTORY_MESSAGES = 100;
-
-const ConversationMessageSchema = Type.Object({
-  role: Type.Union([Type.Literal("user"), Type.Literal("assistant")]),
-  content: Type.String(),
-});
+import { MAX_HISTORY_MESSAGES } from "../constants/auth.constant.js";
 
 const AIChatSchema = {
-  description: "Claude AI Chat. History is managed server-side.",
+  description: "Claude AI Chat. History is managed server-side per session (authenticated or anonymous).",
   tags: ["AI Chat"],
   security: BearerAuth,
   body: Type.Object({
@@ -44,7 +38,7 @@ const AIAnalyzeSchema = {
 };
 
 const HistoryGetSchema = {
-  description: "Get Claude chat history for the authenticated user.",
+  description: "Get Claude chat history for the current session (authenticated or anonymous).",
   tags: ["AI Chat"],
   security: BearerAuth,
   response: {
@@ -60,7 +54,7 @@ const HistoryGetSchema = {
 };
 
 const HistoryDeleteSchema = {
-  description: "Clear Claude chat history for the authenticated user.",
+  description: "Clear Claude chat history for the current session.",
   tags: ["AI Chat"],
   security: BearerAuth,
   response: {
@@ -70,7 +64,9 @@ const HistoryDeleteSchema = {
 };
 
 const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
-  fastify.addHook("onRequest", authHook);
+  // sessionHook resolves identity for both authenticated and anonymous visitors.
+  // It never returns 401 — anonymous users get a stable anon:uuid identifier.
+  fastify.addHook("onRequest", sessionHook);
 
   const claudeService = new ClaudeService(fastify.config.CLAUDE_API_KEY);
 
@@ -80,9 +76,9 @@ const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     async (request, reply) => {
       try {
         const { message } = request.body as { message: string };
-        const email = request.user.email!;
+        const identifier = request.sessionIdentifier;
 
-        const conv = await Conversation.findOne({ email }).lean();
+        const conv = await Conversation.findOne({ identifier }).lean();
         const history = (conv?.messages ?? []).map((m) => ({
           role: m.role,
           content: m.content,
@@ -91,7 +87,7 @@ const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         const result = await claudeService.chat(message, history);
 
         await Conversation.findOneAndUpdate(
-          { email },
+          { identifier },
           {
             $push: {
               messages: {
@@ -119,8 +115,8 @@ const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     { schema: HistoryGetSchema },
     async (request, reply) => {
       try {
-        const email = request.user.email!;
-        const conv = await Conversation.findOne({ email }).lean();
+        const identifier = request.sessionIdentifier;
+        const conv = await Conversation.findOne({ identifier }).lean();
         return reply.code(200).send(conv?.messages ?? []);
       } catch (error: any) {
         request.log.error(error);
@@ -134,9 +130,9 @@ const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     { schema: HistoryDeleteSchema },
     async (request, reply) => {
       try {
-        const email = request.user.email!;
+        const identifier = request.sessionIdentifier;
         await Conversation.findOneAndUpdate(
-          { email },
+          { identifier },
           { $set: { messages: [] } },
           { upsert: true },
         );

@@ -5,13 +5,16 @@ import bcrypt from "bcrypt";
 import { ROUTES } from "../config/app-routes.js";
 import { binanceService } from "../services/binance.singleton.js";
 import {
+  ANON_COOKIE_NAME,
   COOKIE_NAME,
+  MAX_HISTORY_MESSAGES,
   SALT_ROUNDS,
   SEVEN_DAYS_SECONDS,
 } from "../constants/auth.constant.js";
 import { EMAIL_REGEX } from "../constants/regex.constant.js";
 import { ErrorBody } from "../schemas/shared.schema.js";
 import User from "../schema/users.schema.js";
+import Conversation from "../schema/conversation.schema.js";
 
 const cookieOptions = (maxAgeSeconds: number) => ({
   httpOnly: true,
@@ -20,6 +23,65 @@ const cookieOptions = (maxAgeSeconds: number) => ({
   path: "/",
   maxAge: maxAgeSeconds,
 });
+
+/**
+ * After a successful sign-in, check whether the browser carries an anonymous
+ * session cookie. If it does, append those messages to the authenticated user's
+ * conversation, then delete the anonymous document and clear the cookie.
+ *
+ * This gives users a seamless transition: chat history they built while browsing
+ * anonymously carries over the moment they log in.
+ */
+async function mergeAnonHistory(
+  fastify: FastifyInstance,
+  anonToken: string | undefined,
+  userIdentifier: string,
+  reply: Parameters<FastifyPluginAsync>[1],
+): Promise<void> {
+  if (!anonToken) return;
+
+  let anonymousId: string;
+
+  try {
+    const decoded = fastify.jwt.verify<{
+      anonymousId: string;
+      isAnonymous: boolean;
+    }>(anonToken);
+
+    if (!decoded.anonymousId || !decoded.isAnonymous) return;
+    anonymousId = decoded.anonymousId;
+  } catch {
+    // Expired or tampered cookie — nothing to merge, just clean up
+    reply.clearCookie(ANON_COOKIE_NAME, { path: "/" });
+    return;
+  }
+
+  const anonIdentifier = `anon:${anonymousId}`;
+  const anonConv = await Conversation.findOne({ identifier: anonIdentifier }).lean();
+
+  if (!anonConv || anonConv.messages.length === 0) {
+    reply.clearCookie(ANON_COOKIE_NAME, { path: "/" });
+    return;
+  }
+
+  // Append anon messages after any existing authenticated history (they are newer —
+  // the user was chatting anonymously after a prior sign-out).
+  await Conversation.findOneAndUpdate(
+    { identifier: userIdentifier },
+    {
+      $push: {
+        messages: {
+          $each: anonConv.messages,
+          $slice: -MAX_HISTORY_MESSAGES,
+        },
+      },
+    },
+    { upsert: true },
+  );
+
+  await Conversation.deleteOne({ identifier: anonIdentifier });
+  reply.clearCookie(ANON_COOKIE_NAME, { path: "/" });
+}
 
 const SignupSchema = {
   description:
@@ -232,6 +294,11 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         );
 
         reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
+
+        // Carry over any anonymous chat history into this session
+        const anonToken = (request.cookies as Record<string, string | undefined>)[ANON_COOKIE_NAME];
+        await mergeAnonHistory(fastify, anonToken, `key:${apiKey}`, reply);
+
         return reply.code(200).send({ message: "Signed in successfully" });
       } catch (error: any) {
         if (error.status && error.status >= 400 && error.status < 500) {
@@ -284,6 +351,11 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         );
 
         reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
+
+        // Carry over any anonymous chat history into this session
+        const anonToken = (request.cookies as Record<string, string | undefined>)[ANON_COOKIE_NAME];
+        await mergeAnonHistory(fastify, anonToken, user.email, reply);
+
         return reply.code(200).send({ message: "Signed in successfully" });
       } catch (error: any) {
         if (error.status && error.status >= 400 && error.status < 500) {
@@ -299,6 +371,9 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   );
 
   fastify.post(ROUTES.SIGN_OUT, { schema: SignoutSchema }, async (_request, reply) => {
+    // Clear auth session only. The anon_session cookie is intentionally kept so
+    // the user can continue chatting anonymously after signing out and their
+    // history persists if they sign back in.
     reply.clearCookie(COOKIE_NAME, { path: "/" });
     return reply.code(200).send({ message: "Signed out successfully" });
   });

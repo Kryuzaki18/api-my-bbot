@@ -21,8 +21,18 @@ declare module "@fastify/jwt" {
       email?: string;
       apiKey?: string;
       apiSecret?: string;
-      useTestnet: boolean;
+      useTestnet?: boolean;
+      anonymousId?: string;
+      isAnonymous?: boolean;
     };
+  }
+}
+
+declare module "fastify" {
+  interface FastifyRequest {
+    /** Stable session key: email for auth users, `anon:<uuid>` for anonymous. Set by sessionHook. */
+    sessionIdentifier: string;
+    isAnonymousSession: boolean;
   }
 }
 

@@ -7,17 +7,22 @@ export interface IConversationMessage {
 }
 
 export interface IConversation extends Document {
-  email: string;
+  /**
+   * Stable session key — one of:
+   *   - `email@domain.com`   authenticated user (email login)
+   *   - `key:<binanceApiKey>` authenticated user (API-key login)
+   *   - `anon:<uuid>`        anonymous visitor
+   */
+  identifier: string;
   messages: IConversationMessage[];
 }
 
 const ConversationSchema: Schema = new Schema(
   {
-    email: {
+    identifier: {
       type: String,
       required: true,
       unique: true,
-      lowercase: true,
       trim: true,
     },
     messages: [
@@ -31,6 +36,6 @@ const ConversationSchema: Schema = new Schema(
   { timestamps: true },
 );
 
-ConversationSchema.index({ email: 1 });
+ConversationSchema.index({ identifier: 1 });
 
 export default mongoose.model<IConversation>("Conversations", ConversationSchema);
