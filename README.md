@@ -1,61 +1,84 @@
-# 🚀 API Trading Bot
+# API Trading Bot
 
-A **production-ready cryptocurrency trading backend API** built with Node.js, designed for real-time trading, automation, and seamless frontend integration (Angular, React, etc.).
-
-> ⚡ Powered by Binance Futures API
-> 🔐 Secure by design (no API keys exposed to frontend)
-> 📊 Real-time ready via WebSocket
+A production-ready **Binance Futures trading backend** built with Fastify and TypeScript. Acts as a secure proxy between the frontend and Binance — API keys never touch the browser.
 
 ---
 
-# 📌 Features
+## Tech Stack
 
-- ⚡ Real-time market data (WebSocket)
-- 📈 Futures trading (BUY / SELL orders)
-- 🔐 Secure API key handling via backend
-- 📊 REST endpoints for account & pricing
-- 🔄 Auto-reconnect WebSocket support
-- 🧱 Modular and scalable architecture
-- 📄 Swagger API documentation
-
----
-
-# 🧱 Tech Stack
-
-- **Backend:** Node.js, Fastify
-- **Language:** TypeScript
-- **API:** Binance Futures
-- **Realtime:** WebSocket
-- **Docs:** Swagger (OpenAPI 3.0)
+| Layer | Technology |
+|---|---|
+| Runtime | Node.js (ESM) |
+| Framework | Fastify 5 |
+| Language | TypeScript 6 |
+| Database | MongoDB (Mongoose) |
+| Auth | JWT + httpOnly cookies |
+| AI | Google Gemini, Anthropic Claude |
+| Docs | Swagger UI (`/docs`) |
+| Process Manager | PM2 |
 
 ---
 
-# ⚙️ Architecture
+## Features
+
+- **Two authentication flows** — sign in with Binance API keys directly, or register an account with email/password that stores keys server-side
+- **Testnet / live switching** — toggle between Binance Testnet and production per session without re-authenticating
+- **Anonymous session support** — unauthenticated users can use the AI chat; history merges seamlessly on sign-in
+- **Futures trading** — place market/limit orders, set TP/SL, close positions, cancel orders
+- **User data stream** — manage Binance `listenKey` lifecycle (start, keep-alive, close)
+- **AI chat (Claude)** — server-side conversation history per session (authenticated or anonymous)
+- **AI market analysis** — send a symbol + interval to get an AI-generated analysis via Gemini or Claude
+- **AI trade bot** — automated trade execution driven by Gemini's market analysis
+- **Rate limiting** — per-route limits (e.g. sign-in: 3 req/min)
+- **Security** — Helmet, CORS with credentials, signed cookies, bcrypt password hashing
+
+---
+
+## Architecture
 
 ```
-Frontend (Angular / React)
+Angular Frontend (port 4444)
+        ↓  HTTP + httpOnly cookie
+Fastify API (port 5555)
         ↓
-Backend API (Node.js)
-        ↓
-Binance API (Futures)
+   ┌────┴────────────┐
+Binance API      MongoDB Atlas
+(Futures)        (users, conversations)
 ```
 
 ---
 
-# 🔑 Environment Setup
+## Environment Setup
 
-Create a `.env` file:
+Create a `.env` file in the project root:
 
-```
-JWT_SECRET="changeme_to_a_super_strong_random_string"
-PORT=3000
+```env
+PORT=5555
+
+# Sign JWT session tokens (min 16 chars, keep secret)
+JWT_SECRET="your_jwt_secret_here"
+
+# Sign httpOnly cookies (min 16 chars, keep secret)
+COOKIE_SECRET="your_cookie_secret_here"
+
+# MongoDB Atlas connection string
+MONGODB_URI="mongodb+srv://<user>:<password>@<cluster>.mongodb.net/<dbname>?retryWrites=true&w=majority"
+
+# Angular frontend origin (CORS credentials)
+CLIENT_ORIGIN="http://localhost:4444"
+
+# Google Gemini API key
+GEMINI_API_KEY="your_gemini_api_key"
+
+# Anthropic Claude API key
+CLAUDE_API_KEY="your_claude_api_key"
 ```
 
 ---
 
-# 📦 Installation
+## Installation
 
-```
+```bash
 git clone https://github.com/Kryuzaki18/api-trading-bot.git
 cd api-trading-bot
 npm install
@@ -63,291 +86,117 @@ npm install
 
 ---
 
-# ▶️ Run
+## Running
 
-```
+```bash
+# Development (hot reload)
 npm run dev
+
+# Production build
+npm run build
+npm run start
+
+# PM2 (production)
+npm run pm2:start-prod
+
+# PM2 commands
+npm run pm2:logs
+npm run pm2:status
+npm run pm2:restart
+npm run pm2:stop
 ```
 
-Server runs at:
-
-```
-http://localhost:3000
-```
+Server runs at `http://localhost:5555`  
+Swagger docs at `http://localhost:5555/docs`
 
 ---
 
-# 📄 Swagger API Documentation
+## API Endpoints
 
-## 🔧 Install Swagger
+### Authentication
 
-```
-npm install swagger-ui-express swagger-jsdoc
-```
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/auth/signup` | Register with email, password, and Binance keys (test + prod) |
+| `POST` | `/api/auth/signin` | Sign in with Binance API key + secret directly |
+| `POST` | `/api/auth/signin-email` | Sign in with email + password |
+| `POST` | `/api/auth/signout` | Clear session cookie |
+| `GET` | `/api/auth/me` | Check if current session is valid |
+| `POST` | `/api/auth/switch-mode` | Toggle testnet ↔ live, refreshes session cookie |
 
----
+### Futures Orders
 
-## 📁 Create Swagger Config
+All routes require a valid session cookie.
 
-### `src/swagger.ts`
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/futures/positions` | Open futures positions |
+| `GET` | `/api/futures/open-orders` | Pending limit/stop orders |
+| `GET` | `/api/futures/pending-tpsl` | Pending TP/SL algo orders |
+| `POST` | `/api/futures/order` | Place a market or limit order |
+| `POST` | `/api/futures/take-profit` | Place a Take Profit order |
+| `POST` | `/api/futures/stop-loss` | Place a Stop Loss order |
+| `POST` | `/api/futures/close-position` | Close position at market price |
+| `POST` | `/api/futures/cancel` | Cancel a pending order |
+| `POST` | `/api/futures/cancel-tpsl` | Cancel a TP/SL algo order |
+| `POST` | `/api/futures/leverage-bracket` | Get leverage brackets for a symbol |
+| `POST` | `/api/futures/commission-rate` | Get commission rates for symbols |
 
-```ts
-import swaggerJsdoc from "swagger-jsdoc";
+### User Data Stream
 
-export const swaggerSpec = swaggerJsdoc({
-  definition: {
-    openapi: "3.0.0",
-    info: {
-      title: "Trading Bot API",
-      version: "1.0.0",
-      description: "API for Binance Futures Trading Bot",
-    },
-    servers: [
-      {
-        url: "http://localhost:3000",
-      },
-    ],
-  },
-  apis: ["./src/routes/*.ts"],
-});
-```
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/user-stream` | Start a user data stream, returns `listenKey` |
+| `PUT` | `/api/user-stream` | Keep-alive ping (call every 30 min) |
+| `DELETE` | `/api/user-stream` | Close the stream |
 
----
+### AI — Claude (server-side history)
 
-## 📁 Setup Swagger UI
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/claude/chat` | Chat with Claude (history managed per session) |
+| `GET` | `/api/claude/history` | Get current session's chat history |
+| `DELETE` | `/api/claude/history` | Clear current session's chat history |
+| `POST` | `/api/claude/analyze-market` | AI market analysis for a symbol + interval |
 
-### `server.ts`
+### AI — Gemini (stateless)
 
-```ts
-import swaggerUi from "swagger-ui-express";
-import { swaggerSpec } from "./swagger";
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/chat` | Chat with Gemini (history passed by client) |
+| `POST` | `/api/analyze-market` | Gemini market analysis for a symbol + interval |
 
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-```
+### Trade Bot
 
----
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/trade-bot` | Analyze market with Gemini and auto-execute a trade |
 
-## 🌐 Access Docs
+### User
 
-```
-http://localhost:3000/api-docs
-```
-
----
-
-# 📡 API Endpoints
-
----
-
-## 🔹 Account
-
-```
-GET /api/account
-```
-
-**Description:** Get futures account balance
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/user-info` | Get current authenticated user's account info |
 
 ---
 
-## 🔹 Place Order
+## Security Notes
 
-```
-POST /api/order
-```
-
-### Body:
-
-```json
-{
-  "symbol": "BTCUSDT",
-  "side": "BUY",
-  "quantity": 0.001
-}
-```
+- API keys are stored in the session JWT inside a signed httpOnly cookie — never sent as a request header from the frontend
+- Passwords are hashed with bcrypt (salt rounds: 12)
+- Sign-in endpoints are rate-limited to 3 requests per minute
+- Anonymous sessions use a separate cookie so history is never mixed with authenticated sessions
+- Always use a strong, unique `JWT_SECRET` and `COOKIE_SECRET` in production
+- Disable withdrawals and restrict by IP on your Binance API key
 
 ---
 
-## 🔹 Get Price
+## Disclaimer
 
-```
-GET /api/price?symbol=BTCUSDT
-```
+This project is for **educational purposes only**. Cryptocurrency trading involves significant financial risk. Use Binance Testnet for safe development and testing.
 
 ---
 
-# 📄 Swagger Annotations Example
-
-### `routes/order.ts`
-
-```ts
-/**
- * @swagger
- * /api/order:
- *   post:
- *     summary: Place a futures order
- *     tags: [Order]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               symbol:
- *                 type: string
- *                 example: BTCUSDT
- *               side:
- *                 type: string
- *                 example: BUY
- *               quantity:
- *                 type: number
- *                 example: 0.001
- *     responses:
- *       200:
- *         description: Order placed successfully
- */
-```
-
----
-
-# ⚡ WebSocket (Real-Time Data)
-
-## Endpoint
-
-```
-wss://fstream.binance.com/ws/btcusdt@trade
-```
-
----
-
-## Example Message
-
-```json
-{
-  "e": "trade",
-  "p": "67250.12"
-}
-```
-
----
-
-## Important
-
-- Price is a **string**
-- Always convert:
-
-```ts
-parseFloat(data.p);
-```
-
----
-
-# 🔐 Security Best Practices
-
-- ❌ Never expose API keys in frontend
-- ✅ Use `.env` variables
-- ✅ Disable withdrawals on Binance API key
-- ✅ Restrict API key by IP
-
----
-
-# 🧪 Development Tips
-
-- Use Binance **Testnet** for safe testing
-- Avoid REST polling → use WebSocket
-- Implement retry & reconnect logic
-
----
-
-# 🚀 Portfolio-Level Improvements
-
-## ✅ Logging (Winston)
-
-```
-npm install winston
-```
-
----
-
-## ✅ Rate Limiting
-
-```
-npm install fastify-rate-limit
-```
-
----
-
-## ✅ Docker
-
-### `Dockerfile`
-
-```dockerfile
-FROM node:18
-WORKDIR /app
-COPY . .
-RUN npm install
-CMD ["npm", "run", "dev"]
-```
-
----
-
-## ✅ Combined WebSocket Stream
-
-```
-wss://fstream.binance.com/stream?streams=btcusdt@trade/ethusdt@trade
-```
-
----
-
-# 📊 Example Use Cases
-
-- Trading Dashboard (Angular)
-- Automated Trading Bot
-- Signal-based Trading System
-- Portfolio Tracker
-
----
-
-# ⚠️ Disclaimer
-
-This project is for **educational purposes only**.
-Trading cryptocurrency involves risk.
-
----
-
-# 👨‍💻 Author
+## Author
 
 **Kryuzaki18**
-
----
-
-# ⭐ Support
-
-If you find this useful:
-
-- ⭐ Star the repo
-- 🍴 Fork it
-- 🧠 Contribute
-
----
-
-# 💡 Final Thoughts
-
-This project demonstrates:
-
-- Real-time systems (WebSocket)
-- Secure backend architecture
-- Financial API integration
-
-👉 Perfect for **portfolio + real-world trading systems**
-
----
-
-## 🔥 Next Steps (Optional Enhancements)
-
-- 📊 Add charting (TradingView / ECharts)
-- 🧠 Implement trading strategies (EMA, RSI)
-- 🤖 Add AI-based signal engine
-- 📈 Build full Angular dashboard
-
----
