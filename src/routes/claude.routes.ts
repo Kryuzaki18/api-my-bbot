@@ -78,10 +78,9 @@ const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         const identifier = request.sessionIdentifier;
 
         const conv = await Conversation.findOne({ identifier }).lean();
-        const history = (conv?.messages ?? []).map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
+        const history = (conv?.messages ?? [])
+          .filter((m) => m.status === "accepted")
+          .map((m) => ({ role: m.role, content: m.content }));
 
         const result = await claudeService.chat(message, history, identifier);
 
@@ -100,7 +99,8 @@ const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
       try {
         const identifier = request.sessionIdentifier;
         const conv = await Conversation.findOne({ identifier }).lean();
-        return reply.code(200).send(conv?.messages ?? []);
+        const messages = (conv?.messages ?? []).filter((m) => m.status === "accepted");
+        return reply.code(200).send(messages);
       } catch (error: any) {
         request.log.error(error);
         return reply.code(500).send({ error: "Internal Server Error", details: error.message });

@@ -62,14 +62,16 @@ export class ClaudeService {
     const parsed = this.extractJSON(textBlock.text);
     if (!parsed) throw new Error(RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
 
+    const status = parsed.status as "accepted" | "rejected";
+
     await Conversation.findOneAndUpdate(
       { identifier },
       {
         $push: {
           messages: {
             $each: [
-              { role: "user", content: message },
-              { role: "assistant", content: parsed.message },
+              { role: "user", status, content: message },
+              { role: "assistant", status, content: parsed.message },
             ],
             $slice: -MAX_HISTORY_MESSAGES,
           },

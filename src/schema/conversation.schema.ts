@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface IConversationMessage {
   role: "user" | "assistant";
+  status: "accepted" | "rejected";
   content: string;
   createdAt: Date;
 }
@@ -28,6 +29,7 @@ const ConversationSchema: Schema = new Schema(
     messages: [
       {
         role: { type: String, enum: ["user", "assistant"], required: true },
+        status: { type: String, enum: ["accepted", "rejected"], required: true },
         content: { type: String, required: true },
         createdAt: { type: Date, default: Date.now },
       },
