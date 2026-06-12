@@ -3,10 +3,9 @@ import { Type } from "@sinclair/typebox";
 
 import { GeminiService } from "../services/gemini.service.js";
 import { ROUTES } from "../config/app-routes.js";
-import { sessionHook } from "../hooks/session.hook.js";
 import Conversation from "../schema/conversation.schema.js";
 import { MAX_HISTORY_MESSAGES } from "../constants/auth.constant.js";
-import { BearerAuth, StandardErrors } from "../schemas/shared.schema.js";
+import { BearerAuth } from "../schemas/shared.schema.js";
 
 const AIChatSchema = {
   description:
@@ -38,38 +37,7 @@ const AIAnalyzeSchema = {
   },
 };
 
-const HistoryGetSchema = {
-  description: "Get Gemini chat history for the current session (authenticated or anonymous).",
-  tags: ["AI Chat"],
-  security: BearerAuth,
-  response: {
-    200: Type.Array(
-      Type.Object({
-        role: Type.Union([Type.Literal("user"), Type.Literal("assistant")]),
-        status: Type.Union([Type.Literal("accepted"), Type.Literal("rejected")]),
-        content: Type.String(),
-        createdAt: Type.String(),
-      }),
-    ),
-    ...StandardErrors,
-  },
-};
-
-const HistoryDeleteSchema = {
-  description: "Clear Gemini chat history for the current session.",
-  tags: ["AI Chat"],
-  security: BearerAuth,
-  response: {
-    200: Type.Object({ message: Type.String() }),
-    ...StandardErrors,
-  },
-};
-
 const geminiRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
-  // Generates / reuses anon_session cookie for unauthenticated users,
-  // and populates request.sessionIdentifier for all routes in this plugin.
-  fastify.addHook("onRequest", sessionHook);
-
   const geminiService = new GeminiService(fastify.config.GEMINI_API_KEY);
 
   fastify.post(
@@ -114,46 +82,6 @@ const geminiRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         }
 
         return reply.code(200).send(result);
-      } catch (error: any) {
-        request.log.error(error);
-        return reply
-          .code(500)
-          .send({ error: "Internal Server Error", details: error.message });
-      }
-    },
-  );
-
-  fastify.get(
-    ROUTES.CHAT_HISTORY,
-    { schema: HistoryGetSchema },
-    async (request, reply) => {
-      try {
-        const identifier = request.sessionIdentifier;
-        const conv = await Conversation.findOne({ identifier, deletedAt: null })
-          .sort({ createdAt: -1 })
-          .lean();
-        return reply.code(200).send(conv?.messages ?? []);
-      } catch (error: any) {
-        request.log.error(error);
-        return reply
-          .code(500)
-          .send({ error: "Internal Server Error", details: error.message });
-      }
-    },
-  );
-
-  fastify.delete(
-    ROUTES.CHAT_HISTORY,
-    { schema: HistoryDeleteSchema },
-    async (request, reply) => {
-      try {
-        const identifier = request.sessionIdentifier;
-        await Conversation.findOneAndUpdate(
-          { identifier, deletedAt: null },
-          { $set: { deletedAt: new Date() } },
-          { sort: { createdAt: -1 } },
-        );
-        return reply.code(200).send({ message: "Conversation cleared." });
       } catch (error: any) {
         request.log.error(error);
         return reply
