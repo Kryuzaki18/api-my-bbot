@@ -6,28 +6,10 @@ import {
   THIRTY_DAYS_SECONDS,
 } from "../constants/auth.constant.js";
 
-/**
- * Universal session hook — works for both authenticated and anonymous users.
- *
- * Resolution order:
- *   1. Valid `session` JWT cookie  → use email or apiKey as identifier
- *   2. Valid `anon_session` JWT cookie → reuse existing anonymous identity
- *   3. Neither / expired           → mint a new UUID, set `anon_session` cookie
- *
- * Sets `request.sessionIdentifier` and `request.isAnonymousSession` so all
- * downstream routes get a stable, guaranteed key without needing to call 401.
- */
 export async function sessionHook(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  // With trustProxy: true in Fastify, request.protocol correctly reflects the
-  // outer protocol (https) even when the Node process itself is on plain HTTP
-  // behind Nginx/ALB. Without this, secure: true gets set but the browser
-  // rejects the cookie because it came over what it sees as an HTTP hop.
-  const secure = request.protocol === "https";
-  const sameSite = secure ? ("none" as const) : ("lax" as const);
-
   try {
     await request.jwtVerify();
     const { email, apiKey, isAnonymous } = request.user;
@@ -44,10 +26,11 @@ export async function sessionHook(
         return;
       }
     }
-  } catch {
-  }
+  } catch {}
 
-  const rawAnonToken = (request.cookies as Record<string, string | undefined>)[ANON_COOKIE_NAME];
+  const rawAnonToken = (request.cookies as Record<string, string | undefined>)[
+    ANON_COOKIE_NAME
+  ];
 
   if (rawAnonToken) {
     try {
@@ -62,12 +45,14 @@ export async function sessionHook(
         return;
       }
     } catch {
-      reply.clearCookie(ANON_COOKIE_NAME, { path: "/", secure, sameSite });
+      reply.clearCookie(ANON_COOKIE_NAME, {
+        path: "/",
+        secure: true,
+        sameSite: "lax" as const,
+      });
     }
   }
 
-  // crypto.randomUUID() emits RFC 4122 v4 UUIDs backed by OS-level CSPRNG.
-  // Collision probability per UUID is ~5.3 × 10⁻³⁶ — practically zero.
   const anonymousId = randomUUID();
 
   const anonToken = request.server.jwt.sign(
@@ -77,8 +62,8 @@ export async function sessionHook(
 
   reply.setCookie(ANON_COOKIE_NAME, anonToken, {
     httpOnly: true,
-    secure,
-    sameSite,
+    secure: true,
+    sameSite: "lax" as const,
     path: "/",
     maxAge: THIRTY_DAYS_SECONDS,
   });

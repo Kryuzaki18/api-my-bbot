@@ -16,12 +16,11 @@ import { ErrorBody } from "../schemas/shared.schema.js";
 import User from "../schema/users.schema.js";
 import Conversation from "../schema/conversation.schema.js";
 
-const cookieOptions = (request: FastifyRequest, maxAgeSeconds: number) => {
-  const secure = request.protocol === "https";
+const cookieOptions = (maxAgeSeconds: number) => {
   return {
     httpOnly: true,
-    secure,
-    sameSite: (secure ? "none" : "lax") as "none" | "lax",
+    secure: true,
+    sameSite: "lax" as const,
     path: "/",
     maxAge: maxAgeSeconds,
   };
@@ -296,7 +295,7 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
           { expiresIn: "7d" },
         );
 
-        reply.setCookie(COOKIE_NAME, token, cookieOptions(request, SEVEN_DAYS_SECONDS));
+        reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
 
         // Carry over any anonymous chat history into this session
         const anonToken = (request.cookies as Record<string, string | undefined>)[ANON_COOKIE_NAME];
@@ -353,7 +352,7 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
           { expiresIn: "7d" },
         );
 
-        reply.setCookie(COOKIE_NAME, token, cookieOptions(request, SEVEN_DAYS_SECONDS));
+        reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
 
         // Carry over any anonymous chat history into this session
         const anonToken = (request.cookies as Record<string, string | undefined>)[ANON_COOKIE_NAME];
@@ -397,7 +396,7 @@ const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
       }
 
       const token = fastify.jwt.sign(payload, { expiresIn: "7d" });
-      reply.setCookie(COOKIE_NAME, token, cookieOptions(request, SEVEN_DAYS_SECONDS));
+      reply.setCookie(COOKIE_NAME, token, cookieOptions(SEVEN_DAYS_SECONDS));
 
       return reply.code(200).send({
         message: `Switched to ${useTestnet ? "demo" : "live"} mode successfully`,
