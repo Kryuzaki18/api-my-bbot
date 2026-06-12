@@ -16,6 +16,7 @@ export interface IConversation extends Document {
    */
   identifier: string;
   messages: IConversationMessage[];
+  deletedAt: Date | null;
 }
 
 const ConversationSchema: Schema = new Schema(
@@ -23,7 +24,6 @@ const ConversationSchema: Schema = new Schema(
     identifier: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
     messages: [
@@ -34,6 +34,7 @@ const ConversationSchema: Schema = new Schema(
         createdAt: { type: Date, default: Date.now },
       },
     ],
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

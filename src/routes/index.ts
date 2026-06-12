@@ -18,7 +18,6 @@ const appRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   fastify.register(geminiRoutes);
   fastify.register(claudeRoutes);
   fastify.register(tradeBotRoutes);
-
 };
 
 export default appRoutes;

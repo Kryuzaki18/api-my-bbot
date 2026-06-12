@@ -5,7 +5,10 @@ import {
   AI_CHAT_PROMPTS_TEMPLATE,
   AI_TRADE_BOT_TEMPLATE,
 } from "../constants/ai.constant.js";
-import { MAX_HISTORY_MESSAGES, RESPONSE_MESSAGES } from "../constants/auth.constant.js";
+import {
+  MAX_HISTORY_MESSAGES,
+  RESPONSE_MESSAGES,
+} from "../constants/auth.constant.js";
 import { BinanceService } from "./binance.service.js";
 import Analyses, { type IAnalyses } from "../schema/analyses.schema.js";
 import Conversation from "../schema/conversation.schema.js";
@@ -44,20 +47,31 @@ export class ClaudeService {
       try {
         const result = JSON.parse(candidate);
         if (result && typeof result === "object") return result;
-      } catch {
-      }
+      } catch {}
     }
 
     return null;
   }
 
-  async chat(message: string, history: ConversationMessage[] = [], identifier: string) {
+  async chat(
+    identifier: string,
+    message: string,
+    history: ConversationMessage[] = [],
+    hasConvo: boolean,
+  ) {
     const messages: Anthropic.MessageParam[] = [
       ...history.map((msg, index) => ({
         role: msg.role as "user" | "assistant",
-        content: index === history.length - 1
-          ? [{ type: "text" as const, text: msg.content, cache_control: { type: "ephemeral" as const } }]
-          : msg.content,
+        content:
+          index === history.length - 1
+            ? [
+                {
+                  type: "text" as const,
+                  text: msg.content,
+                  cache_control: { type: "ephemeral" as const },
+                },
+              ]
+            : msg.content,
       })),
       { role: "user" as const, content: message },
     ];
@@ -68,7 +82,9 @@ export class ClaudeService {
       system: [
         {
           type: "text",
-          text: AI_CHAT_PROMPTS_TEMPLATE + "\nReturn ONLY valid JSON. No markdown, no code blocks.",
+          text:
+            AI_CHAT_PROMPTS_TEMPLATE +
+            "\nReturn ONLY valid JSON. No markdown, no code blocks.",
           cache_control: { type: "ephemeral" },
         },
       ],
@@ -83,25 +99,40 @@ export class ClaudeService {
     }
 
     const parsed = this.extractJSON(textBlock.text);
-    if (!parsed) return { status: "rejected", message: RESPONSE_MESSAGES.SOMETHING_WENT_WRONG, response: null };
+    if (!parsed)
+      return {
+        status: "rejected",
+        message: RESPONSE_MESSAGES.SOMETHING_WENT_WRONG,
+        response: null,
+      };
 
     const status = parsed.status as "accepted" | "rejected";
 
-    await Conversation.findOneAndUpdate(
-      { identifier },
-      {
-        $push: {
-          messages: {
-            $each: [
-              { role: "user", status, content: message },
-              { role: "assistant", status, content: parsed.message },
-            ],
-            $slice: -MAX_HISTORY_MESSAGES,
+    const newMessages = [
+      { role: "user", status, content: message },
+      { role: "assistant", status, content: parsed.message },
+    ];
+
+    if (hasConvo) {
+      await Conversation.findOneAndUpdate(
+        { identifier, deletedAt: null },
+        {
+          $push: {
+            messages: {
+              $each: newMessages,
+              $slice: -MAX_HISTORY_MESSAGES,
+            },
           },
         },
-      },
-      { upsert: true },
-    );
+        { sort: { createdAt: -1 } },
+      );
+    } else {
+      await Conversation.create({
+        identifier,
+        messages: newMessages,
+        deletedAt: null,
+      });
+    }
 
     return parsed;
   }
@@ -136,12 +167,16 @@ export class ClaudeService {
           content: [
             {
               type: "text",
-              text: template + "\nReturn ONLY valid JSON. No markdown, no code blocks.",
+              text:
+                template +
+                "\nReturn ONLY valid JSON. No markdown, no code blocks.",
               cache_control: { type: "ephemeral" },
             },
             {
               type: "text",
-              text: `Here is the marketData for ${symbol} with timeframe ${interval}:\n` + JSON.stringify(klines),
+              text:
+                `Here is the marketData for ${symbol} with timeframe ${interval}:\n` +
+                JSON.stringify(klines),
             },
           ],
         },

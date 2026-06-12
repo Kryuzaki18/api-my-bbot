@@ -64,8 +64,6 @@ const HistoryDeleteSchema = {
 };
 
 const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
-  // sessionHook resolves identity for both authenticated and anonymous visitors.
-  // It never returns 401 — anonymous users get a stable anon:uuid identifier.
   fastify.addHook("onRequest", sessionHook);
 
   const claudeService = new ClaudeService(fastify.config.CLAUDE_API_KEY);
@@ -78,12 +76,12 @@ const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
         const { message } = request.body as { message: string };
         const identifier = request.sessionIdentifier;
 
-        const conv = await Conversation.findOne({ identifier }).lean();
-        const history = (conv?.messages ?? [])
+        const convo = await Conversation.findOne({ identifier, deletedAt: null }).sort({ createdAt: -1 }).lean();
+        const history = (convo?.messages ?? [])
           .filter((m) => m.status === "accepted")
           .map((m) => ({ role: m.role, content: m.content }));
-
-        const result = await claudeService.chat(message, history, identifier);
+          
+        const result = await claudeService.chat(identifier, message, history, !!convo);
 
         return reply.code(200).send(result);
       } catch (error: any) {
@@ -99,7 +97,7 @@ const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     async (request, reply) => {
       try {
         const identifier = request.sessionIdentifier;
-        const conv = await Conversation.findOne({ identifier }).lean();
+        const conv = await Conversation.findOne({ identifier, deletedAt: null }).sort({ createdAt: -1 }).lean();
         return reply.code(200).send(conv?.messages ?? []);
       } catch (error: any) {
         request.log.error(error);
@@ -115,9 +113,9 @@ const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
       try {
         const identifier = request.sessionIdentifier;
         await Conversation.findOneAndUpdate(
-          { identifier },
-          { $set: { messages: [] } },
-          { upsert: true },
+          { identifier, deletedAt: null },
+          { $set: { deletedAt: new Date() } },
+          { sort: { createdAt: -1 } },
         );
         return reply.code(200).send({ message: "Conversation cleared." });
       } catch (error: any) {

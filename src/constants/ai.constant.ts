@@ -6,6 +6,11 @@ const scopes = [
   "Your scope is STRICTLY LIMITED to cryptocurrency trading and financial market analysis.",
 ];
 
+const chatScopes = [
+  `You are a cryptocurrency trading assistant AI specializing in:
+  - Answering questions about cryptocurrency trading and financial markets`
+];
+
 const standards = [
   "Focus on probabilities, not certainties.",
   "Use confluence-based decision making.",
@@ -144,7 +149,7 @@ ${analyzeRules.join("\n")}
 `;
 
 export const AI_CHAT_PROMPTS_TEMPLATE = `
-${scopes.join("\n")}
+${chatScopes.join("\n")}
 ${chatRules.join("\n")}
 `;
 
