@@ -92,7 +92,7 @@ const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   );
 
   fastify.get(
-    ROUTES.CLAUDE_HISTORY,
+    ROUTES.CHAT_HISTORY,
     { schema: HistoryGetSchema },
     async (request, reply) => {
       try {
@@ -107,7 +107,7 @@ const claudeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   );
 
   fastify.delete(
-    ROUTES.CLAUDE_HISTORY,
+    ROUTES.CHAT_HISTORY,
     { schema: HistoryDeleteSchema },
     async (request, reply) => {
       try {

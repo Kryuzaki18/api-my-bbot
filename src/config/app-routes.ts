@@ -1,16 +1,23 @@
 export const ROUTES = {
-  CLAUDE_CHAT: '/api/chat',
+  CHAT_HISTORY: '/api/history',
+
+  GEMINI_CHAT: '/api/chat',
+  GEMINI_ANALYZE_MARKET: '/api/analyze-market',
+
   CLAUDE_ANALYZE_MARKET: '/api/analyze-market',
-  CLAUDE_HISTORY: '/api/history',
+  CLAUDE_CHAT: '/api/chat',
+
   TRADE_BOT: '/api/trade-bot',
   SIGN_UP: '/api/auth/signup',
   SIGN_IN: '/api/auth/signin',
   SIGN_IN_EMAIL: '/api/auth/signin-email',
-  SWITCH_MODE: '/api/auth/switch-mode',
   SIGN_OUT: '/api/auth/signout',
   ME: '/api/auth/me',
+
+  SWITCH_MODE: '/api/auth/switch-mode',
   USER_INFO: '/api/user-info',
   USER_STREAM: '/api/user-stream',
+
   FUTURES_ORDER: '/api/futures/order',
   FUTURES_TAKE_PROFIT: '/api/futures/take-profit',
   FUTURES_STOP_LOSS: '/api/futures/stop-loss',
