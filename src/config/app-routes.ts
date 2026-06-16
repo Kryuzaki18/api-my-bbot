@@ -1,4 +1,6 @@
 export const ROUTES = {
+  HEALTH: '/api/health',
+
   CHAT_HISTORY: '/api/history',
 
   GEMINI_CHAT: '/api/g/chat',

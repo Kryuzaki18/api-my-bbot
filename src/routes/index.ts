@@ -10,8 +10,11 @@ import claudeRoutes from "./claude.routes.js";
 import chatRoutes from "./chat.routes.js";
 import tradeBotRoutes from "./trade-bot.routes.js";
 import { sessionHook } from "../hooks/session.hook.js";
+import healthRoutes from "./health.routes.js";
 
 const appRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
+  await fastify.register(healthRoutes);
+
   fastify.addHook("onRequest", sessionHook);
 
   fastify.register(authRoutes);
